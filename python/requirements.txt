@@ -1,0 +1,9 @@
+casadi
+matplotlib
+numba
+numpy
+pandas
+scipy
+seaborn
+streamlit
+tqdm
