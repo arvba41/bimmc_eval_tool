@@ -19,6 +19,16 @@ import os
 
 import streamlit as st
 
+# use latex in streamlit
+st.markdown(
+    """
+    <style>
+    .math {font-size: 1.5em !important;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # %%
 # User inputs
 
@@ -125,7 +135,8 @@ with st.sidebar:
         )
 
     elif which_mosfet == "Costumized MOSFET":
-        Rdson_2l = st.number_input("Rdson [Ohm]", min_value=0.0, value=4.6e-3)
+        Rdson_2l = st.number_input("Rdson [mOhm]", min_value=0.0, value=4.6)
+        Rdson_2l *= 1e-3  # convert to Ohm
 
         ImosRated_RMS = st.number_input(
             "MOSFET continuous RMS current rating [A]", min_value=0.0, value=400.0
@@ -172,7 +183,7 @@ with st.sidebar:
         )
 
     else:
-        raise ValueError("Selected MOSFET device is not supported.")
+        raise ValueError("Selected MOSFET device is currently not supported.")
 
     # Ambient to case temperature
     # In liquid-cooled traction inverters, which is very commong rtoday, the combined case-to-ambient thermal resistance (Rth_CA = Rth_CS + Rth_SA) is typically in the range of 0.05-0.10 K/W per module or inverter leg. Advanced packaging techniques, including double-sided cooling and silver-sintered die attachment, can reduce thermal resistance by up to 50% compared with conventional single-sided cooled designs.
@@ -492,8 +503,9 @@ with tab1:
             st.subheader("Cell RC parameters")
             st.pyplot(fig_battery_parameters, width="stretch")
 
-# -------------------------------------------------------------------------------
+# %%
 # Analysis
+# -------------------------------------------------------------------------------
 motor = daf.MotorParameters(Rs, Ld, Lq, psi_f, pp)
 opti, x, (Tau_ref, wm_ref, vmax) = daf.create_mtpa_optimization_problem(
     motor

@@ -98,7 +98,7 @@ def plot_switching_slopes(
         layout="constrained",
         # The sidebar controls the inputs; the output figure belongs to the
         # wide main area, so do not use the small paper-sized figure here.
-        figsize=(textwidth, textwidth / goldenratio * 1.2),
+        # figsize=(textwidth, textwidth / goldenratio * 1.2),
     )
     ax.scatter(
         rawdata_df["didt_on_X"],
@@ -150,7 +150,7 @@ def plot_Rdson_vs_Tj(Rdson_vs_Tj_rawdata, Rdson_Tj_fun, save_path=None):
         layout="constrained",
         # The sidebar controls the inputs; the output figure belongs to the
         # wide main area, so do not use the small paper-sized figure here.
-        figsize=(textwidth, textwidth / goldenratio),
+        # figsize=(textwidth, textwidth / goldenratio),
     )
     ax.scatter(
         Rdson_vs_Tj_rawdata["Tj"],
@@ -183,7 +183,7 @@ def plot_cell_ocv_vs_soc(ocv_dict, battery_chem, save_path=None):
         layout="constrained",
         # The sidebar controls the inputs; the output figure belongs to the
         # wide main area, so do not use the small paper-sized figure here.
-        figsize=(textwidth, textwidth / goldenratio),
+        # figsize=(textwidth, textwidth / goldenratio),
     )
     ax.plot(soc_vec, ocv_vec)
     ax.set_xlabel(r"$z$ [-]")
@@ -206,7 +206,7 @@ def plot_battery_parameters(R0_fn, R1_fn, C1_fn, save_path=None):
     fig, ax = plt.subplots(
         3,
         1,
-        figsize=(textwidth, textwidth / goldenratio * 1.2),
+        # figsize=(textwidth, textwidth / goldenratio * 1.2),
         clear=True,
         layout="constrained",
         sharex=True,
@@ -245,7 +245,7 @@ def plot_mtpa_maps(data: MtpaMapData, options: PlotOptions = PlotOptions()):
     fig, ax = plt.subplots(
         2,
         2,
-        figsize=(textwidth, textwidth / goldenratio * 2),
+        # figsize=(textwidth, textwidth / goldenratio * 2),
         sharex=True,
         sharey=True,
         layout="constrained",
@@ -326,7 +326,7 @@ def plot_mtpa_maps_dqs(data: MtpaMapData, options: PlotOptions = PlotOptions()):
     fig, ax = plt.subplots(
         3,
         1,
-        figsize=(textwidth, textwidth / goldenratio * 2),
+        # figsize=(textwidth, textwidth / goldenratio * 2),
         sharex=True,
         sharey=True,
         layout="constrained",
@@ -411,7 +411,7 @@ def plot_losses(data: LossMapData, options: PlotOptions = PlotOptions()):
     fig, ax = plt.subplots(
         3,
         1,
-        figsize=(textwidth, textwidth / goldenratio * 2.5),
+        # figsize=(textwidth, textwidth / goldenratio * 2.5),
         sharex=True,
         layout="constrained",
         num=options.figure_number,
@@ -468,7 +468,7 @@ def plot_efficiency(data: EfficiencyMapData, options: PlotOptions = PlotOptions(
     fig, ax = plt.subplots(
         3,
         1,
-        figsize=(textwidth, textwidth / goldenratio * 2.5),
+        # figsize=(textwidth, textwidth / goldenratio * 2.5),
         sharex=True,
         layout="constrained",
         num=options.figure_number,
@@ -525,7 +525,7 @@ def plot_Tc_and_Tj(data: TemperatureMapData, options: PlotOptions = PlotOptions(
     fig, ax = plt.subplots(
         2,
         1,
-        figsize=(textwidth, textwidth / goldenratio * 1.2),
+        # figsize=(textwidth, textwidth / goldenratio * 1.2),
         sharex=True,
         layout="constrained",
         num=options.figure_number,
@@ -580,7 +580,7 @@ def plot_total_loss_comparison(
     fig, ax = plt.subplots(
         3,
         1,
-        figsize=(textwidth, textwidth / goldenratio * 1.7),
+        # figsize=(textwidth, textwidth / goldenratio * 1.7),
         sharex=True,
         layout="constrained",
         num=options.figure_number,
@@ -675,7 +675,7 @@ def plot_total_efficiency_comparison(
     fig, ax = plt.subplots(
         3,
         1,
-        figsize=(textwidth, textwidth / goldenratio * 1.7),
+        # figsize=(textwidth, textwidth / goldenratio * 1.7),
         sharex=True,
         layout="constrained",
         num=options.figure_number,
@@ -779,7 +779,7 @@ def plot_individual_loss_comparison(
     fig, ax = plt.subplots(
         3,
         1,
-        figsize=(textwidth, textwidth / goldenratio * 2.5),
+        # figsize=(textwidth, textwidth / goldenratio * 2.5),
         sharex=True,
         layout="constrained",
         num=options.figure_number,
