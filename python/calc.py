@@ -272,9 +272,10 @@ def calc_losses_bimmc(Id, Iq, Vd, Vq, wm_ref, Te_ref, config: BimmcLossConfig):
         if we > 0:
 
             ts = 1 / (fsw[ii][0] * 100)  # [s] time step for the switching frequency
-            tvec = np.arange(
-                0, 2 * np.pi / we, ts
-            )  # create a time vector for one electrical cycle
+            t_cycle = 2 * np.pi / we  # [s] one electrical cycle
+            # simulate two electrical cycles; the first lets the RC state settle and
+            # only the second is used for the average loss
+            tvec = np.arange(0, 2 * t_cycle, ts)
             theta = we * tvec
 
             for jj, _ in enumerate(Te_ref):
@@ -303,6 +304,7 @@ def calc_losses_bimmc(Id, Iq, Vd, Vq, wm_ref, Te_ref, config: BimmcLossConfig):
                     r0 * nscells / npcells,
                     r1 * nscells / npcells,
                     c1 * npcells / nscells,
+                    t_cycle,
                 )
 
         else:
@@ -341,16 +343,21 @@ def batterymdel(ib, R0, R1, C1, Vc):
 
 
 @njit
-def simulate_battery_loss(ib_profile, tvec, R0, R1, C1):
+def simulate_battery_loss(ib_profile, tvec, R0, R1, C1, t_avg_start=0.0):
     """
-    Simulate the battery current profile over time and compute the cumulative energy loss.
+    Simulate the battery current profile over time and return the average power loss
+    for t >= t_avg_start (samples before it only let the RC state settle).
     """
-    Vc = 0
-    Eb = 0
+    Vc = 0.0
+    Eb = 0.0
+    T = 0.0
     for i in range(ib_profile.size):
         dVc_dt, dEb_dt = batterymdel(ib_profile[i], R0, R1, C1, Vc)
         if i < tvec.size - 1:
-            Vc += dVc_dt * (tvec[i + 1] - tvec[i])
-            Eb += dEb_dt * (tvec[i + 1] - tvec[i])
+            dt = tvec[i + 1] - tvec[i]
+            Vc += dVc_dt * dt
+            if tvec[i] >= t_avg_start:
+                Eb += dEb_dt * dt
+                T += dt
 
-    return Eb / (tvec[-1] - tvec[0])
+    return Eb / T
