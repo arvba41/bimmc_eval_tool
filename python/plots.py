@@ -732,14 +732,14 @@ def plot_total_efficiency_comparison(
     ax[2].contourf(
         wm_ref_vec,
         Tau_ref_vec,
-        (eff_case_1 - eff_case_2).T * 100,
+        (eff_case_2 - eff_case_1).T * 100,
         levels=50,
         cmap="viridis",
     )
     cl = ax[2].contour(
         wm_ref_vec,
         Tau_ref_vec,
-        (eff_case_1 - eff_case_2).T * 100,
+        (eff_case_2 - eff_case_1).T * 100,
         levels=5,
         colors="k",
         linewidths=0.5,
@@ -748,7 +748,7 @@ def plot_total_efficiency_comparison(
     ax[2].plot(wm_ref_vec, Tmax, "r--")
     ax[2].set_ylabel(r"$\tau_e$ [Nm]")
     ax[2].set_title(
-        rf"$\Delta \eta$: {data.str_case1} - {data.str_case2} [%]",
+        rf"$\Delta \eta$: {data.str_case2} - {data.str_case1} [%]",
         fontsize=8,
         loc="left",
     )
@@ -815,7 +815,13 @@ def plot_individual_loss_comparison(
             titles,
         )
     ):
-        diff = (data_case_1 - data_case_2).T * scale
+        if data.quantity == "efficiency":
+            # efficiency difference is shown as case 2 - case 1 (BI-MMC - 2L)
+            diff = (data_case_2 - data_case_1).T * scale
+            label_first, label_second = label_case_2, label_case_1
+        else:
+            diff = (data_case_1 - data_case_2).T * scale
+            label_first, label_second = label_case_1, label_case_2
         cf = ax[ii].contourf(
             wm_ref_vec,
             Tau_ref_vec,
@@ -834,7 +840,7 @@ def plot_individual_loss_comparison(
         ax[ii].clabel(cl, inline=True, fontsize=8)
         ax[ii].set_ylabel(r"$\tau_e$ [Nm]")
         ax[ii].set_title(
-            rf"{title}: {label_case_1} - {label_case_2}", fontsize=8, loc="left"
+            rf"{title}: {label_first} - {label_second}", fontsize=8, loc="left"
         )
 
     ax[-1].set_xlabel(r"$\omega_m$ [rpm]")
