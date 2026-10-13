@@ -4,6 +4,7 @@ numba
 numpy
 pandas
 scipy
+openpyxl
 seaborn
 streamlit
 tqdm

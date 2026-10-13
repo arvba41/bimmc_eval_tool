@@ -14,9 +14,6 @@ from copy import deepcopy
 from pathlib import Path
 
 import casadi as ca
-import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -329,7 +326,6 @@ def plot_results(df, base, speed_pu, torque_pu):
     axes.ravel()[0].legend()
     fig.suptitle(f"Efficiency sensitivity (speed={speed_pu} pu, torque={torque_pu} pu)")
     fig.tight_layout()
-    fig.savefig(RESULTS_DIR / "sensitivity_efficiency.png", dpi=200)
 
     # Tornado chart: efficiency span over each sweep
     span = (
@@ -347,7 +343,6 @@ def plot_results(df, base, speed_pu, torque_pu):
         ax.set_title(title)
         ax.grid(alpha=0.3, axis="x")
     fig2.tight_layout()
-    fig2.savefig(RESULTS_DIR / "sensitivity_tornado.png", dpi=200)
 
 
 def main():
@@ -360,9 +355,20 @@ def main():
 
     os.makedirs(RESULTS_DIR, exist_ok=True)
     df, base = run_sensitivity(args.speed_pu, args.torque_pu, args.variation, args.points)
-    df.to_csv(RESULTS_DIR / "sensitivity_results.csv", index=False)
+    xlsx_path = RESULTS_DIR / "sensitivity_results.xlsx"
+    with pd.ExcelWriter(xlsx_path) as writer:
+        df.to_excel(writer, sheet_name="sweeps", index=False)
+        pd.DataFrame(
+            {
+                "quantity": ["speed_pu", "torque_pu", "variation", "points"]
+                + ["nominal_eff_2l_pct", "nominal_eff_bimmc_pct"],
+                "value": [args.speed_pu, args.torque_pu, args.variation, args.points]
+                + list(base),
+            }
+        ).to_excel(writer, sheet_name="setup", index=False)
+    print(f"Results saved in {xlsx_path.resolve()}")
     plot_results(df, base, args.speed_pu, args.torque_pu)
-    print(f"Results saved in {RESULTS_DIR.resolve()}")
+    plt.show()
 
 
 if __name__ == "__main__":
