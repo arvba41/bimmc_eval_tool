@@ -20,14 +20,14 @@ import os
 import streamlit as st
 
 # use latex in streamlit
-st.markdown(
-    """
-    <style>
-    .math {font-size: 1.5em !important;}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# st.markdown(
+#     """
+#     <style>
+#     .math {font-size: 1.5em !important;}
+#     </style>
+#     """,
+#     unsafe_allow_html=True,
+# )
 
 # %%
 # User inputs
@@ -93,6 +93,9 @@ with st.sidebar:
     Rs = rs_pu * ZBase  # stator phase resistance [Ohm]
     Ld = ld_pu * ZBase / (wmBase * pp * 2 * ca.pi / 60)  # d-axis inductance [H]
     Lq = lq_pu * ZBase / (wmBase * pp * 2 * ca.pi / 60)  # q-axis inductance [H]
+    if psi_f <= Ld * Ibase:
+        st.error("d-axis inductance too large: Ld*Ibase >= magnet flux (no finite maximum speed).")
+        st.stop()
     wmMax = (
         VMax / (psi_f - Ld * Ibase) / pp * 60 / (2 * ca.pi)
     )  # maximum mechanical speed [rpm]
@@ -133,7 +136,10 @@ with st.sidebar:
         Rdson_vs_Tj_rawdata = pd.read_csv(
             os.path.join("data", "Wolfspeed_MOSFET_Rdson_vs_Tj_data.csv")
         )
-
+    # elif which_mosfet == "CAB760M12HM3":
+    # TODO: add the CAB760M12HM3 MOSFET device parameters and data
+    # https://assets.wolfspeed.com/uploads/2024/01/Wolfspeed_CAB760M12HM3_data_sheet.pdf
+    
     elif which_mosfet == "Costumized MOSFET":
         Rdson_2l = st.number_input("Rdson [mOhm]", min_value=0.0, value=4.6)
         Rdson_2l *= 1e-3  # convert to Ohm
@@ -554,7 +560,14 @@ for ii, wm in tqdm(enumerate(wm_ref_vec), desc="wm", total=len(wm_ref_vec), unit
 
         # solve the optimization problem and record the computation time
         t0 = time.time()
-        sol = opti.solve()
+        try:
+            sol = opti.solve()
+        except RuntimeError:
+            # no feasible MTPA solution (e.g., voltage limit exceeded at this speed/torque)
+            Id_vec[ii, jj] = np.nan
+            Iq_vec[ii, jj] = np.nan
+            opti.set_initial(x, 0)
+            continue
         tcom_ns.append((time.time() - t0) * 1e9)
 
         Id_vec[ii, jj] = sol.value(x[0])
@@ -562,11 +575,6 @@ for ii, wm in tqdm(enumerate(wm_ref_vec), desc="wm", total=len(wm_ref_vec), unit
 
         # reset the initial guess for the next iteration to the current solution
         opti.set_initial(x, sol.value(x))
-
-        # calculate the d-axis and q-axis voltages for the current solution (for inverter calculations)
-        wr = wm * 2 * np.pi / 60 * pp  # electrical speed [rad/s]
-        Vd_ = Id_vec[ii, jj] * Rs - wr * Lq * Iq_vec[ii, jj]
-        Vq_ = Iq_vec[ii, jj] * Rs + wr * (psi_f + Ld * Id_vec[ii, jj])
 
     # # mtpa_status.update(label="MTPA analysis complete", state="complete")
 
@@ -584,7 +592,7 @@ Iq[over_current_mask] = np.nan
 
 # Creating the voltage reference vector
 wr = wm_ref_vec[:, None] * pp * 2 * np.pi / 60
-Vd = Id_vec * Rs - wr * Lq * Iq
+Vd = Id * Rs - wr * Lq * Iq
 Vq = Iq * Rs + wr * (psi_f + Ld * Id)
 # *******************************************************************************
 
@@ -638,15 +646,15 @@ with tab2:
     Power_loss_inverter_conduction_2l,
     Power_loss_inverter_switching_2l,
     Power_loss_battery_2l,
-    Temp_case_2l,
     Temp_junction_2l,
+    Temp_case_2l,
 ) = daf.calc_losses_2l(
     Id,
     Iq,
     Vd,
     Vq,
     daf.TwoLevelLossConfig(
-        dc_voltage=V_dc,
+        dc_voltage=2 * V_dc,  # full DC-link voltage (V_dc is half the pack voltage)
         on_resistance=Rdson_2l,
         parallel_devices=Npmos_2l,
         switching_frequency=fsw,
@@ -674,14 +682,14 @@ Power_loss_total_2l = (
 # %%
 # Analysis of the BI-MMC inverter
 # -------------------------------------------------------------------------------
-wm_mesh = np.meshgrid(wm_ref_vec * 2 * ca.pi / 60 * pp, Tau_ref_vec, indexing="ij")[0]
+wm_mesh = np.meshgrid(wm_ref_vec / 60 * pp, Tau_ref_vec, indexing="ij")[0]  # electrical frequency [Hz]
 fsw_bimmc = mf_bimmc * wm_mesh  # switching frequency for the BI-MMC inverter [Hz]
 (
     Power_loss_inverter_conduction_bimmc,
     Power_loss_inverter_switching_bimmc,
     Power_loss_battery_bimmc,
-    Temp_case_bimmc,
     Temp_junction_bimmc,
+    Temp_case_bimmc,
 ) = daf.calc_losses_bimmc(
     Id,
     Iq,
@@ -772,7 +780,7 @@ with tab3:
         Efficiency_battery_2l = Pout_vec / (
             Pout_vec + (Power_loss_battery_2l * np.sign(Pout_vec))
         )
-        Efficiency_total_2l = Pout_vec / (Pout_vec + Power_loss_total_2l)
+        Efficiency_total_2l = Pout_vec / (Pout_vec + np.sign(Pout_vec) * Power_loss_total_2l)
 
         # mask the efficiency values that are below 9% (i.e., set them to NaN) to avoid plotting them
         Efficiency_conduction_2l[Efficiency_total_2l < 0.9] = np.nan
@@ -844,7 +852,9 @@ with tab3:
         Efficiency_battery_bimmc = Pout_vec / (
             Pout_vec + (Power_loss_battery_bimmc * np.sign(Pout_vec))
         )
-        Efficiency_total_bimmc = Pout_vec / (Pout_vec + Power_loss_total_bimmc)
+        Efficiency_total_bimmc = Pout_vec / (
+            Pout_vec + np.sign(Pout_vec) * Power_loss_total_bimmc
+        )
 
         # mask the efficiency values that are below 90% (i.e., set them to NaN) to avoid plotting them
         Efficiency_conduction_bimmc[Efficiency_total_bimmc < 0.9] = np.nan

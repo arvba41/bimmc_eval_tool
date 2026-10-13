@@ -134,7 +134,7 @@ def create_mtpa_optimization_problem(motor: MotorParameters):
 
 
 def calc_losses_2l(Id, Iq, Vd, Vq, config: TwoLevelLossConfig):
-    vdc = config.dc_voltage
+    vdc = config.dc_voltage  # full DC-link (battery pack) voltage [V]
     Rdson = config.on_resistance
     Npmos = config.parallel_devices
     fsw = config.switching_frequency
@@ -169,7 +169,8 @@ def calc_losses_2l(Id, Iq, Vd, Vq, config: TwoLevelLossConfig):
     # Esw_per_sw        = 1 / 2 * Vdc * Idq * 2 / \pi / Npmos * (tri + tfv + tfi + trv) * Npmos
     #                   = 1 / 2 * Vdc * Idq * 2 / \pi * (tri + tfv + tfi + trv)
     Esw_per_sw = 1 / 2 * vdc * Idq * (tri + tfv + tfi + trv)
-    Psw_loss = 3 * 2 * Esw_per_sw * Npmos * fsw  # [W]
+    # Esw_per_sw already covers all Npmos parallel devices of one switch (6 switches)
+    Psw_loss = 3 * 2 * Esw_per_sw * fsw  # [W]
 
     # calculate the case and junction temperatures
     Tc = (
@@ -181,7 +182,7 @@ def calc_losses_2l(Id, Iq, Vd, Vq, config: TwoLevelLossConfig):
     )  # [°C] junction temperature
 
     # battery losses
-    # Idc = 3/2 * \sqrt(Id^2 + Iq^2) * cos(arctan(Vq/Vd) - arctan(Iq/Id)) * \sqrt(Vd^2 + Vq^2) / (2 * vdc)
+    # Idc = 3/2 * \sqrt(Id^2 + Iq^2) * cos(arctan(Vq/Vd) - arctan(Iq/Id)) * \sqrt(Vd^2 + Vq^2) / vdc
     P_inv_in = (
         3
         / 2
@@ -189,7 +190,7 @@ def calc_losses_2l(Id, Iq, Vd, Vq, config: TwoLevelLossConfig):
         * np.cos(np.arctan2(Vq, Vd) - np.arctan2(Iq, Id))
         * np.sqrt(Vd**2 + Vq**2)
     )  # [W] input power to the inverter
-    Idc = (P_inv_in + ((Pmos_loss + Psw_loss) * np.sign(P_inv_in))) / (2 * vdc)
+    Idc = (P_inv_in + ((Pmos_loss + Psw_loss) * np.sign(P_inv_in))) / vdc
     Pbatt = (
         Idc**2
         * (battery.r0 + battery.r1)
@@ -247,16 +248,17 @@ def calc_losses_bimmc(Id, Iq, Vd, Vq, wm_ref, Te_ref, config: BimmcLossConfig):
     # Esw_per_sm        = 1 / 2 * Vs * \sqrt(Id^2 + Iq^2) * (tri + tfv + tfi + trv) * Nsw (where Nsw - number of switches per SM, Nsw = 4)
     # Esw_per_phase     = 1 / 2 * Vs * \sqrt(Id^2 + Iq^2) * (tri + tfv + tfi + trv) * Nsw * Nsm (where Nsm - number of SMs per phase)
     Esw_per_sw = 1 / 2 * vs * Idq * (tri + tfv + tfi + trv) * 4 * Nsm
-    Psw_loss = 3 * 2 * Esw_per_sw * fsw  # [W]
+    # Esw_per_sw is per phase (4 * Nsm switches already included), so only x3 phases
+    Psw_loss = 3 * Esw_per_sw * fsw  # [W]
 
     # calculate the case and junction temperatures
     Tc = (
         thermal.ambient_temperature
-        + (Pmos_loss + Psw_loss) / (3 * 2 * Nsm * 4 * Npmos) * thermal.case_to_ambient
+        + (Pmos_loss + Psw_loss) / (3 * Nsm * 4 * Npmos) * thermal.case_to_ambient
     )  # [°C] case temperature
     Tj = (
         Tc
-        + (Pmos_loss + Psw_loss) / (3 * 2 * Nsm * 4 * Npmos) * thermal.junction_to_case
+        + (Pmos_loss + Psw_loss) / (3 * Nsm * 4 * Npmos) * thermal.junction_to_case
     )  # [°C] junction temperature
 
     # battery losses
@@ -276,6 +278,10 @@ def calc_losses_bimmc(Id, Iq, Vd, Vq, wm_ref, Te_ref, config: BimmcLossConfig):
             theta = we * tvec
 
             for jj, _ in enumerate(Te_ref):
+
+                if np.isnan(Id[ii, jj]) or np.isnan(Iq[ii, jj]):
+                    Pbatt[ii, jj] = np.nan  # infeasible/over-current point
+                    continue
 
                 io = np.cos(theta) * Id[ii, jj] - np.sin(theta) * Iq[ii, jj]
 
