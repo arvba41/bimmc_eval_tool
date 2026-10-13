@@ -83,6 +83,8 @@ class IndividualLossMapData_comparison:
     battery_w_case_2: np.ndarray
     str_case2: str
     operating_map: OperatingMap
+    # "loss": inputs in W, shown in kW; "efficiency": inputs as fractions, shown in pp
+    quantity: str = "loss"
 
 
 # %%
@@ -773,6 +775,22 @@ def plot_individual_loss_comparison(
         data.switching_w_case_2,
         data.battery_w_case_2,
     )
+    if data.quantity == "efficiency":
+        scale = 100.0
+        titles = [
+            r"$\eta_\mathrm{on}$ [pp]",
+            r"$\eta_\mathrm{sw}$ [pp]",
+            r"$\eta_\mathrm{b}$ [pp]",
+        ]
+    elif data.quantity == "loss":
+        scale = 1e-3
+        titles = [
+            r"$P_\mathrm{on}^l$ [kW]",
+            r"$P_\mathrm{sw}^l$ [kW]",
+            r"$P_\mathrm{b}^l$ [kW]",
+        ]
+    else:
+        raise ValueError(f"Unknown quantity: {data.quantity!r}")
     wm_ref_vec, Tau_ref_vec = operating_map.speed_rpm, operating_map.torque_nm
     PBase, TBase = operating_map.base_power_w, operating_map.base_torque_nm
 
@@ -792,24 +810,21 @@ def plot_individual_loss_comparison(
             [cond_case_2, sw_case_2, batt_case_2],
             [data.str_case1] * 3,
             [data.str_case2] * 3,
-            [
-                r"$P_\mathrm{on}^l$ [kW]",
-                r"$P_\mathrm{sw}^l$ [kW]",
-                r"$P_\mathrm{b}^l$ [kW]",
-            ],
+            titles,
         )
     ):
+        diff = (data_case_1 - data_case_2).T * scale
         cf = ax[ii].contourf(
             wm_ref_vec,
             Tau_ref_vec,
-            data_case_1.T - data_case_2.T,
+            diff,
             levels=50,
             cmap="viridis",
         )
         cl = ax[ii].contour(
             wm_ref_vec,
             Tau_ref_vec,
-            data_case_1.T - data_case_2.T,
+            diff,
             levels=5,
             colors="k",
             linewidths=0.5,

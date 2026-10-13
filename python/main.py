@@ -970,11 +970,12 @@ with tab3:
                 Efficiency_battery_bimmc,
                 r"BI-MMC",
                 operating_map,
+                quantity="efficiency",
             ),
             dpf.PlotOptions(
                 figure_number=43,
                 save_path=RESULTS_DIR
-                / f"individual_losses_maps_comparison_{soc_tag}.png",
+                / f"individual_efficiency_maps_comparison_{soc_tag}.png",
             ),
         )
         # fig.savefig(RESULTS_DIR / f"individual_losses_maps_comparison_{soc_tag}.png", dpi=200)
