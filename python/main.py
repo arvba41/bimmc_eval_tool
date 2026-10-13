@@ -47,6 +47,9 @@ tab1, tab2, tab3 = st.tabs(["Parameters", "MTPA maps", "Loss and Efficiency maps
 RESULTS_DIR = Path("results_mtpa_soc")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
+# efficiency values below this threshold are not plotted
+EFF_MIN = 0.9
+
 with st.sidebar:
 
     # --------------------------------------------------------------------------------
@@ -149,16 +152,16 @@ with st.sidebar:
         )
         ImosRated = ImosRated_RMS * np.sqrt(2)
         didt_on_val = st.number_input(
-            "di/dt (on) [A/ns]", min_value=0.0, value=8.0, step=0.1
+            "di/dt (on) [A/ns]", min_value=0.01, value=8.0, step=0.1
         )  # [A/ns] (assumed)
         didt_off_val = st.number_input(
-            "di/dt (off) [A/ns]", min_value=0.0, value=15.0, step=0.1
+            "di/dt (off) [A/ns]", min_value=0.01, value=15.0, step=0.1
         )  # [A/ns] (assumed)
         dvdt_on_val = st.number_input(
-            "dv/dt (on) [V/ns]", min_value=0.0, value=25.0, step=0.1
+            "dv/dt (on) [V/ns]", min_value=0.01, value=25.0, step=0.1
         )  # [V/ns] (assumed)
         dvdt_off_val = st.number_input(
-            "dv/dt (off) [V/ns]", min_value=0.0, value=25.0, step=0.1
+            "dv/dt (off) [V/ns]", min_value=0.01, value=25.0, step=0.1
         )  # [V/ns] (assumed)
         rawdata_df = pd.DataFrame(
             {
@@ -385,16 +388,16 @@ with st.sidebar:
     )  # number of parallel MOSFETs [-]
     # NOTE: For now the switching slopes are assumed to be constant for the BI-MMC, but they can be updated based on the actual device datasheet or experimental data.
     didt_on_bimmc = st.number_input(
-        "didt (on) [A/ns]", min_value=0.0, value=1.0, step=0.1
+        "didt (on) [A/ns]", min_value=0.01, value=1.0, step=0.1
     )  # [A/ns] (assumed)
     didt_off_bimmc = st.number_input(
-        "didt (off) [A/ns]", min_value=0.0, value=1.0, step=0.1
+        "didt (off) [A/ns]", min_value=0.01, value=1.0, step=0.1
     )  # [A/ns] (assumed)
     dvdt_on_bimmc = st.number_input(
-        "dvdt (on) [V/ns]", min_value=0.0, value=0.5, step=0.1
+        "dvdt (on) [V/ns]", min_value=0.01, value=0.5, step=0.1
     )  # [V/ns] (assumed)
     dvdt_off_bimmc = st.number_input(
-        "dvdt (off) [V/ns]", min_value=0.0, value=0.5, step=0.1
+        "dvdt (off) [V/ns]", min_value=0.01, value=0.5, step=0.1
     )  # [V/ns] (assumed)
     mf_bimmc = st.number_input(
         "Pulse number (switching frequency multiplier) [-]",
@@ -782,11 +785,11 @@ with tab3:
         )
         Efficiency_total_2l = Pout_vec / (Pout_vec + np.sign(Pout_vec) * Power_loss_total_2l)
 
-        # mask the efficiency values that are below 9% (i.e., set them to NaN) to avoid plotting them
-        Efficiency_conduction_2l[Efficiency_total_2l < 0.9] = np.nan
-        Efficiency_switching_2l[Efficiency_total_2l < 0.9] = np.nan
-        Efficiency_battery_2l[Efficiency_total_2l < 0.9] = np.nan
-        Efficiency_total_2l[Efficiency_total_2l < 0.9] = np.nan
+        # mask the efficiency values that are below EFF_MIN (i.e., set them to NaN) to avoid plotting them
+        Efficiency_conduction_2l[Efficiency_total_2l < EFF_MIN] = np.nan
+        Efficiency_switching_2l[Efficiency_total_2l < EFF_MIN] = np.nan
+        Efficiency_battery_2l[Efficiency_total_2l < EFF_MIN] = np.nan
+        Efficiency_total_2l[Efficiency_total_2l < EFF_MIN] = np.nan
 
         # plot the efficiency maps for the two-level inverter
         fig = dpf.plot_efficiency(
@@ -856,11 +859,11 @@ with tab3:
             Pout_vec + np.sign(Pout_vec) * Power_loss_total_bimmc
         )
 
-        # mask the efficiency values that are below 90% (i.e., set them to NaN) to avoid plotting them
-        Efficiency_conduction_bimmc[Efficiency_total_bimmc < 0.9] = np.nan
-        Efficiency_switching_bimmc[Efficiency_total_bimmc < 0.9] = np.nan
-        Efficiency_battery_bimmc[Efficiency_total_bimmc < 0.9] = np.nan
-        Efficiency_total_bimmc[Efficiency_total_bimmc < 0.9] = np.nan
+        # mask the efficiency values that are below EFF_MIN (i.e., set them to NaN) to avoid plotting them
+        Efficiency_conduction_bimmc[Efficiency_total_bimmc < EFF_MIN] = np.nan
+        Efficiency_switching_bimmc[Efficiency_total_bimmc < EFF_MIN] = np.nan
+        Efficiency_battery_bimmc[Efficiency_total_bimmc < EFF_MIN] = np.nan
+        Efficiency_total_bimmc[Efficiency_total_bimmc < EFF_MIN] = np.nan
 
         # plot the efficiency maps for the BI-MMC inverter
         fig = dpf.plot_efficiency(
@@ -896,8 +899,8 @@ with tab3:
     )
     efficiency_total_2l = Pout_vec / (Pout_vec + np.sign(Pout_vec) * Ptotal_2l)
     efficiency_total_bimmc = Pout_vec / (Pout_vec + np.sign(Pout_vec) * Ptotal_bimmc)
-    efficiency_total_2l[efficiency_total_2l < 0.95] = np.nan
-    efficiency_total_bimmc[efficiency_total_bimmc < 0.95] = np.nan
+    efficiency_total_2l[efficiency_total_2l < EFF_MIN] = np.nan
+    efficiency_total_bimmc[efficiency_total_bimmc < EFF_MIN] = np.nan
 
     col1, col2 = st.columns(2)
     with col1:

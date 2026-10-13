@@ -76,7 +76,9 @@ class BimmcLossConfig:
 
 
 def _slope_value(slope: Slope, current: np.ndarray) -> np.ndarray | float:
-    return slope(current) if callable(slope) else slope
+    value = slope(current) if callable(slope) else slope
+    # a zero/negative slope would give an infinite switching time (division by zero)
+    return np.maximum(value, 1e-6)
 
 
 # %%

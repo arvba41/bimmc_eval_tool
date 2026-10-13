@@ -89,6 +89,15 @@ class IndividualLossMapData_comparison:
 
 # %%
 # Local plotting functions
+
+
+def _max_torque(speed_rpm, base_power_w, base_torque_nm):
+    """Torque limit [Nm]: constant-torque up to base speed, constant-power above it."""
+    w = np.asarray(speed_rpm, dtype=float) * 2 * np.pi / 60
+    with np.errstate(divide="ignore"):
+        tmax = base_power_w / w  # inf at standstill, clipped below
+    return np.minimum(tmax, base_torque_nm)
+
 def plot_switching_slopes(
     rawdata_df, didt_on_fun, didt_off_fun, dvdt_on_fun, dvdt_off_fun, save_path=None
 ):
@@ -241,8 +250,7 @@ def plot_mtpa_maps(data: MtpaMapData, options: PlotOptions = PlotOptions()):
     Vdc, Ibase, soc = data.dc_voltage, data.base_current, data.soc
     TBase, PBase = operating_map.base_torque_nm, operating_map.base_power_w
 
-    Tmax = PBase / (wm_ref_vec * 2 * np.pi / 60)
-    Tmax[Tmax > TBase] = TBase
+    Tmax = _max_torque(wm_ref_vec, PBase, TBase)
 
     fig, ax = plt.subplots(
         2,
@@ -322,8 +330,7 @@ def plot_mtpa_maps_dqs(data: MtpaMapData, options: PlotOptions = PlotOptions()):
     Vdc, Ibase, soc = data.dc_voltage, data.base_current, data.soc
     TBase, PBase = operating_map.base_torque_nm, operating_map.base_power_w
 
-    Tmax = PBase / (wm_ref_vec * 2 * np.pi / 60)
-    Tmax[Tmax > TBase] = TBase
+    Tmax = _max_torque(wm_ref_vec, PBase, TBase)
 
     fig, ax = plt.subplots(
         3,
@@ -422,8 +429,7 @@ def plot_losses(data: LossMapData, options: PlotOptions = PlotOptions()):
 
     # wm_grid, _ = np.meshgrid(wm_ref_vec, Tau_ref_vec, indexing="ij")
 
-    Tmax = PBase / (wm_ref_vec * 2 * np.pi / 60)
-    Tmax[Tmax > TBase] = TBase
+    Tmax = _max_torque(wm_ref_vec, PBase, TBase)
 
     cf = ax[0].contourf(wm_ref_vec, Tau_ref_vec, Pmos_loss.T, levels=50, cmap="viridis")
     cl = ax[0].contour(
@@ -479,8 +485,7 @@ def plot_efficiency(data: EfficiencyMapData, options: PlotOptions = PlotOptions(
 
     # wm_grid, _ = np.meshgrid(wm_ref_vec, Tau_ref_vec, indexing="ij")
 
-    Tmax = PBase / (wm_ref_vec * 2 * np.pi / 60)
-    Tmax[Tmax > TBase] = TBase
+    Tmax = _max_torque(wm_ref_vec, PBase, TBase)
 
     cf = ax[0].contourf(wm_ref_vec, Tau_ref_vec, eff_cond.T, levels=50, cmap="viridis")
     cl = ax[0].contour(
@@ -534,8 +539,7 @@ def plot_Tc_and_Tj(data: TemperatureMapData, options: PlotOptions = PlotOptions(
         clear=True,
     )
 
-    Tmax = PBase / (wm_ref_vec * 2 * np.pi / 60)
-    Tmax[Tmax > TBase] = TBase
+    Tmax = _max_torque(wm_ref_vec, PBase, TBase)
 
     cf = ax[0].contourf(wm_ref_vec, Tau_ref_vec, Tc.T, levels=50, cmap="viridis")
     cl = ax[0].contour(
@@ -589,8 +593,7 @@ def plot_total_loss_comparison(
         clear=True,
     )
 
-    Tmax = PBase / (wm_ref_vec * 2 * np.pi / 60)
-    Tmax[Tmax > TBase] = TBase
+    Tmax = _max_torque(wm_ref_vec, PBase, TBase)
 
     cf = ax[0].contourf(
         wm_ref_vec, Tau_ref_vec, total_loss_case_1.T / 1e3, levels=50, cmap="viridis"
@@ -684,8 +687,7 @@ def plot_total_efficiency_comparison(
         clear=True,
     )
 
-    Tmax = PBase / (wm_ref_vec * 2 * np.pi / 60)
-    Tmax[Tmax > TBase] = TBase
+    Tmax = _max_torque(wm_ref_vec, PBase, TBase)
 
     cf = ax[0].contourf(
         wm_ref_vec, Tau_ref_vec, eff_case_1.T * 100, levels=50, cmap="viridis"
