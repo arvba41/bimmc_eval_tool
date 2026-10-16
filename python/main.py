@@ -37,7 +37,7 @@ title_column, logo_column = st.columns([5, 1])
 with title_column:
     st.title("AC battery evaluator")
 with logo_column:
-    logo_files = sorted((Path(__file__).parent.parent / "logo").glob("*_white.png"))
+    logo_files = sorted((Path(__file__).parent / "logo").glob("*_white.png"))
     if logo_files:
         st.image(logo_files[0], width="content")
 
@@ -384,7 +384,7 @@ with st.sidebar:
         "MOSFET continuous RMS current rating [A]", min_value=1.0, value=400.0
     )  # [A] (example taken from IQDH29NE2LM5CGSC from Infineon)
     Npmos_bimmc = np.max(
-        [np.ceil(Ibase / Imax_mosfet).astype(int), 4]
+        [np.ceil(Ibase / (Imax_mosfet * np.sqrt(2))).astype(int), 4]
     )  # number of parallel MOSFETs [-]
     # NOTE: For now the switching slopes are assumed to be constant for the BI-MMC, but they can be updated based on the actual device datasheet or experimental data.
     didt_on_bimmc = st.number_input(
@@ -490,7 +490,7 @@ with tab1:
     )
     st.subheader("BI-MMC parameters")
     st.write(
-        f"- Number of submodules per phase: `{Nsm}`\n- Number of redundant submodules per phase: `{Nsm_redundant_pu * 100}%`\n- BI-MMC Rdson: `{Rdson_bimmc * 1e3:.2f} mOhm`\n- Number of parallel MOSFETs: `{Npmos_bimmc}`\n- BI-MMC Vmax: `{Vmax_bimmc:.2f} V`\n Number of series cells per SM: `{Nscells_bimmc}`\n- SM battery voltage: `{Vs_bimmc:.2f} V`"
+        f"- Number of submodules per phase: `{Nsm}`\n- Number of redundant submodules per phase: `{Nsm_redundant_pu * 100}%`\n- BI-MMC Rdson: `{Rdson_bimmc * 1e3:.2f} mOhm`\n- Number of parallel MOSFETs: `{Npmos_bimmc}`\n- BI-MMC Vmax: `{Vmax_bimmc:.2f} V`\n- Number of series cells per SM: `{Nscells_bimmc}`\n- SM battery voltage: `{Vs_bimmc:.2f} V`"
     )
 
     # -------------------------------------------------------------------------------
@@ -627,7 +627,6 @@ with tab2:
             ),
         )
         # fig.suptitle(f"SOC={soc * 100:.0f}%", fontsize=10)
-        fig.savefig(RESULTS_DIR / f"mtpa_maps_{soc_tag}.png", dpi=200)
         st.pyplot(fig, width="stretch")
     with col2:
         fig2 = dpf.plot_mtpa_maps_dqs(
@@ -638,7 +637,6 @@ with tab2:
             ),
         )
         # fig2.suptitle(f"SOC={soc * 100:.0f}%", fontsize=10)
-        fig2.savefig(RESULTS_DIR / f"mtpa_maps_dqs_{soc_tag}.png", dpi=200)
         st.pyplot(fig2, width="stretch")
     # *******************************************************************************
 
@@ -732,6 +730,9 @@ Power_loss_total_bimmc = (
     + Power_loss_battery_bimmc
 )
 
+# output power map [W]
+Pout_vec = wm_ref_vec[:, None] * Tau_ref_vec[None, :] * 2 * np.pi / 60
+
 # %%
 # Plotting the losses and efficiency maps for the two-level inverter
 # -------------------------------------------------------------------------------
@@ -755,7 +756,6 @@ with tab3:
             ),
         )
         # fig3.suptitle(f"SOC={soc * 100:.0f}%", fontsize=10)
-        fig3.savefig(RESULTS_DIR / f"losses_maps_2l_{soc_tag}.png", dpi=200)
         st.pyplot(fig3, width="stretch")
         fig4 = dpf.plot_Tc_and_Tj(
             dpf.TemperatureMapData(Temp_junction_2l, Temp_case_2l, operating_map),
@@ -765,14 +765,9 @@ with tab3:
             ),
         )
         # fig4.suptitle(f"SOC={soc * 100:.0f}%", fontsize=10)
-        fig4.savefig(RESULTS_DIR / f"temperature_maps_2l_{soc_tag}.png", dpi=200)
         st.pyplot(fig4, width="stretch")
 
     with col2:
-        Pout_vec = (
-            wm_ref_vec[:, None] * Tau_ref_vec[None, :] * 2 * np.pi / 60
-        )  # create a vector of output power values [W]
-
         # calculate the efficiency maps for the two-level inverter
         Efficiency_conduction_2l = Pout_vec / (
             Pout_vec + (Power_loss_inverter_conduction_2l * np.sign(Pout_vec))
@@ -800,11 +795,10 @@ with tab3:
                 operating_map,
             ),
             dpf.PlotOptions(
-                figure_number=20,
+                figure_number=22,
                 save_path=RESULTS_DIR / f"efficiency_maps_2l_{soc_tag}.png",
             ),
         )
-        fig.savefig(RESULTS_DIR / f"efficiency_maps_2l_{soc_tag}.png", dpi=200)
         st.pyplot(fig, width="stretch")
 
     st.divider()
@@ -827,7 +821,6 @@ with tab3:
             ),
         )
         # fig5.suptitle(f"SOC={soc * 100:.0f}%", fontsize=10)
-        fig5.savefig(RESULTS_DIR / f"losses_maps_bimmc_{soc_tag}.png", dpi=200)
         st.pyplot(fig5, width="stretch")
         fig6 = dpf.plot_Tc_and_Tj(
             dpf.TemperatureMapData(Temp_junction_bimmc, Temp_case_bimmc, operating_map),
@@ -837,14 +830,8 @@ with tab3:
             ),
         )
         # fig6.suptitle(f"SOC={soc * 100:.0f}%", fontsize=10)
-        fig6.savefig(RESULTS_DIR / f"temperature_maps_bimmc_{soc_tag}.png", dpi=200)
         st.pyplot(fig6, width="stretch")
     with col2:
-
-        Pout_vec = (
-            wm_ref_vec[:, None] * Tau_ref_vec[None, :] * 2 * np.pi / 60
-        )  # create a vector of output power values [W]
-
         # calculate the efficiency maps for the BI-MMC inverter
         Efficiency_conduction_bimmc = Pout_vec / (
             Pout_vec + (Power_loss_inverter_conduction_bimmc * np.sign(Pout_vec))
@@ -874,11 +861,10 @@ with tab3:
                 operating_map,
             ),
             dpf.PlotOptions(
-                figure_number=30,
+                figure_number=32,
                 save_path=RESULTS_DIR / f"efficiency_maps_bimmc_{soc_tag}.png",
             ),
         )
-        fig.savefig(RESULTS_DIR / f"efficiency_maps_bimmc_{soc_tag}.png", dpi=200)
         st.pyplot(fig, width="stretch")
 
     st.divider()
@@ -887,30 +873,15 @@ with tab3:
         "Below are the comparison plots for the losses and efficiency maps between the *SiC-based two-level inverter* and the *Si-based battery-integrated modular multi-level inverter*."
     )
 
-    Ptotal_2l = (
-        Power_loss_inverter_conduction_2l
-        + Power_loss_inverter_switching_2l
-        + Power_loss_battery_2l
-    )
-    Ptotal_bimmc = (
-        Power_loss_inverter_conduction_bimmc
-        + Power_loss_inverter_switching_bimmc
-        + Power_loss_battery_bimmc
-    )
-    efficiency_total_2l = Pout_vec / (Pout_vec + np.sign(Pout_vec) * Ptotal_2l)
-    efficiency_total_bimmc = Pout_vec / (Pout_vec + np.sign(Pout_vec) * Ptotal_bimmc)
-    efficiency_total_2l[efficiency_total_2l < EFF_MIN] = np.nan
-    efficiency_total_bimmc[efficiency_total_bimmc < EFF_MIN] = np.nan
-
     col1, col2 = st.columns(2)
     with col1:
         fig = dpf.plot_total_loss_comparison(
             dpf.TotalLossMapData_comparison(
-                Ptotal_2l,
-                efficiency_total_2l,
+                Power_loss_total_2l,
+                Efficiency_total_2l,
                 r"2L",
-                Ptotal_bimmc,
-                efficiency_total_bimmc,
+                Power_loss_total_bimmc,
+                Efficiency_total_bimmc,
                 r"BI-MMC",
                 operating_map,
             ),
@@ -946,11 +917,11 @@ with tab3:
     with col2:
         fig = dpf.plot_total_efficiency_comparison(
             dpf.TotalLossMapData_comparison(
-                Ptotal_2l,
-                efficiency_total_2l,
+                Power_loss_total_2l,
+                Efficiency_total_2l,
                 r"2L",
-                Ptotal_bimmc,
-                efficiency_total_bimmc,
+                Power_loss_total_bimmc,
+                Efficiency_total_bimmc,
                 r"BI-MMC",
                 operating_map,
             ),

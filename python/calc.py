@@ -211,7 +211,8 @@ def calc_losses_bimmc(Id, Iq, Vd, Vq, wm_ref, Te_ref, config: BimmcLossConfig):
     vs = config.submodule_voltage
     Rdson = config.on_resistance
     Npmos = config.parallel_devices
-    fsw = config.switching_frequency
+    # accept a scalar or a (speed x torque) map; the battery loop indexes fsw[ii][jj]
+    fsw = np.broadcast_to(np.asarray(config.switching_frequency, dtype=float), np.shape(Id))
     thermal = config.thermal
     r0 = config.battery.r0
     r1 = config.battery.r1

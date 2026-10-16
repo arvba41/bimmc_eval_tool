@@ -105,6 +105,7 @@ def plot_switching_slopes(
     fig, ax = plt.subplots(
         1,
         1,
+        num=1,  # fixed number: reruns reuse the figure instead of leaking a new one
         clear=True,
         layout="constrained",
         # The sidebar controls the inputs; the output figure belongs to the
@@ -157,6 +158,7 @@ def plot_Rdson_vs_Tj(Rdson_vs_Tj_rawdata, Rdson_Tj_fun, save_path=None):
     fig, ax = plt.subplots(
         1,
         1,
+        num=2,  # fixed number: reruns reuse the figure instead of leaking a new one
         clear=True,
         layout="constrained",
         # The sidebar controls the inputs; the output figure belongs to the
@@ -190,6 +192,7 @@ def plot_cell_ocv_vs_soc(ocv_dict, battery_chem, save_path=None):
     fig, ax = plt.subplots(
         1,
         1,
+        num=3,  # fixed number: reruns reuse the figure instead of leaking a new one
         clear=True,
         layout="constrained",
         # The sidebar controls the inputs; the output figure belongs to the
@@ -218,6 +221,7 @@ def plot_battery_parameters(R0_fn, R1_fn, C1_fn, save_path=None):
         3,
         1,
         # figsize=(textwidth, textwidth / goldenratio * 1.2),
+        num=4,  # fixed number: reruns reuse the figure instead of leaking a new one
         clear=True,
         layout="constrained",
         sharex=True,

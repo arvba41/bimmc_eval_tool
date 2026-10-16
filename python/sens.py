@@ -223,7 +223,8 @@ def evaluate(p, speed_pu=1.0, torque_pu=1.0):
             switching=slopes_2l,
         ),
     )
-    eff_2l = (Pout / (Pout + Pc + Ps + Pb)).item()
+    # same sign convention as main.py so regenerative points (Pout < 0) stay <= 100 %
+    eff_2l = (Pout / (Pout + np.sign(Pout) * (Pc + Ps + Pb))).item()
 
     # --- BI-MMC
     Nsm = int(p["Nsm"])
@@ -231,7 +232,8 @@ def evaluate(p, speed_pu=1.0, torque_pu=1.0):
     Npcells_b = int(
         np.ceil(p["Ebatt"] / (3 * Nsm * Vnom * Nscells_b * p["Qcell"]))
     )
-    Npmos_b = max(int(np.ceil(Ibase / p["Imax_mosfet"])), 4)
+    # Imax_mosfet is an RMS rating; Ibase is a peak current
+    Npmos_b = max(int(np.ceil(Ibase / (p["Imax_mosfet"] * np.sqrt(2)))), 4)
     Vs_b = Vcell * Nscells_b
     # NOTE: same switching-frequency definition as in main.py
     fsw_b = p["mf_bimmc"] * np.array([[wr / (2 * np.pi)]])  # [Hz]
@@ -262,7 +264,7 @@ def evaluate(p, speed_pu=1.0, torque_pu=1.0):
             pole_pairs=p["pp"],
         ),
     )
-    eff_b = (Pout / (Pout + Pc + Ps + Pb)).item()
+    eff_b = (Pout / (Pout + np.sign(Pout) * (Pc + Ps + Pb))).item()
     return eff_2l, eff_b
 
 
