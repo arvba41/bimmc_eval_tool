@@ -178,8 +178,28 @@ def bimmc_inputs(p):
         step=0.1,
     )
     # Rdson and current rating: example taken from the Infineon IQDH29NE2LM5CGSC
+    bimmc_mosfet = st.selectbox(
+        "Rdson(Tj) of the BI-MMC MOSFET",
+        options=["Fit of Infineon IQDH29NE2LM5CGSC datasheet", "Custom polynomial"],
+    )
+    if bimmc_mosfet == "Custom polynomial":
+        st.markdown(
+            "Rdson(Tj) / Rdson(25 °C) as a 3rd order polynomial: "
+            "$c_3 T_j^3 + c_2 T_j^2 + c_1 T_j + c_0$ (Tj in °C)"
+        )
+        p["Rdson_poly_bimmc"] = [
+            st.number_input(
+                f"Rdson polynomial coefficient c{k}",
+                value=float(c),
+                format="%.6e",
+                key=f"rdson_poly_bimmc_c{k}",
+            )
+            for k, c in zip((3, 2, 1, 0), model.RDSON_POLY_BIMMC_DATASHEET)
+        ]
+    else:
+        p["Rdson_poly_bimmc"] = None
     p["Rdson_bimmc"] = (
-        st.number_input("Rdson [mOhm]", min_value=0.0, value=0.3, step=0.1) * 1e-3
+        st.number_input("Rdson at 25 °C [mOhm]", min_value=0.0, value=0.3, step=0.1) * 1e-3
     )
     p["Imax_mosfet"] = st.number_input(
         "MOSFET continuous RMS current rating [A]", min_value=1.0, value=400.0
@@ -367,6 +387,14 @@ with tab1:
         show(
             dpf.plot_Rdson_vs_Tj(
                 Rdson_raw, Rdson_Tj_fun, save_path=RESULTS_DIR / "Rdson_vs_Tj.png"
+            )
+        )
+        st.subheader("BI-MMC MOSFET Rdson vs Tj")
+        show(
+            dpf.plot_Rdson_vs_Tj(
+                model.bimmc_rdson_raw() if p["Rdson_poly_bimmc"] is None else None,
+                model.bimmc_rdson_fun(p),
+                save_path=RESULTS_DIR / "Rdson_vs_Tj_bimmc.png",
             )
         )
     with battery_plots:

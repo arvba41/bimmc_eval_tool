@@ -17,6 +17,7 @@ Parameters are passed as a dict in the format of NOMINAL (user inputs).
 """
 
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -83,7 +84,10 @@ NOMINAL = {
     #          peak phase voltage matches the 2L inverter's (fair comparison);
     # "ceil":  exactly Nsm submodules, cells per submodule rounded up (dashboard)
     "bimmc_sizing": "match",
-    "Rdson_bimmc": 0.3e-3,  # [Ohm]
+    "Rdson_bimmc": 0.3e-3,  # [Ohm] at 25 °C
+    # 3rd order Rdson(Tj) polynomial [c3 .. c0] of the BI-MMC MOSFET; None = fit of the
+    # IQDH29NE2LM5CGSC datasheet data
+    "Rdson_poly_bimmc": None,
     "Imax_mosfet": 400.0,  # [A]
     "didt_on_bimmc": 1.0,
     "didt_off_bimmc": 1.0,
@@ -98,6 +102,10 @@ NOMINAL = {
 
 # default coefficients of the customised MOSFET: 3rd order fit of the Wolfspeed data [c3 .. c0]
 RDSON_POLY_DEFAULT = (9.43462740e-12, 2.99523011e-05, 5.77104581e-04, 9.67661695e-01)
+
+
+# 3rd order fit [c3 .. c0] of the Infineon IQDH29NE2LM5CGSC datasheet data
+RDSON_POLY_BIMMC_DATASHEET = (1.25942161e-08, 5.42696885e-06, 3.02535971e-03, 9.21144458e-01)
 
 
 def _table_function(x, y):
@@ -146,6 +154,29 @@ def mosfet_raw(p):
         }
     )
     return raw, None
+
+
+def bimmc_rdson_raw():
+    """Raw normalised Rdson(Tj) data of the Infineon IQDH29NE2LM5CGSC (BI-MMC MOSFET)."""
+    return pd.read_csv(DATA_DIR / "Infineon_MOSFET_IQDH29NE2LM5CGSC_Rdson_vs_Tj_data.csv")
+
+
+@lru_cache(maxsize=1)
+def _bimmc_rdson_datasheet_fun():
+    raw = bimmc_rdson_raw()
+    return rdson_poly_fun(fit_rdson_poly(raw), (raw["Tj"].min(), raw["Tj"].max()))
+
+
+def bimmc_rdson_fun(p=None):
+    """Rdson(Tj) / Rdson(25 °C) of the BI-MMC MOSFET.
+
+    A 3rd order polynomial [c3, c2, c1, c0] given in p["Rdson_poly_bimmc"] is used when
+    set; otherwise the polynomial fit of the IQDH29NE2LM5CGSC datasheet data.
+    """
+    coef = (p or {}).get("Rdson_poly_bimmc")
+    if coef is None:
+        return _bimmc_rdson_datasheet_fun()
+    return rdson_poly_fun(coef)
 
 
 def mosfet_data(p):
@@ -378,6 +409,8 @@ def loss_maps(p, soc, wm_vec, T_vec, voltage_limit="own", rdson_tj=True, rdson_i
             ),
             battery=daf.BatteryParameters(R0, R1, C1, d.Nscells_b, d.Npcells_b),
             pole_pairs=d.motor.pole_pairs,
+            rdson_vs_tj=bimmc_rdson_fun(p) if rdson_tj else None,
+            rdson_iter=rdson_iter,
         ),
     )
 

@@ -73,6 +73,9 @@ class BimmcLossConfig:
             didt_on=1.0, didt_off=1.0, dvdt_on=0.5, dvdt_off=0.5
         )
     )
+    # Rdson(Tj) / Rdson(25 °C); None keeps on_resistance constant
+    rdson_vs_tj: Callable | None = None
+    rdson_iter: int = 5  # fixed-point iterations Tj -> Rdson(Tj) -> losses -> Tj
 
 
 def _slope_value(slope: Slope, current: np.ndarray) -> np.ndarray | float:
@@ -233,8 +236,6 @@ def calc_losses_bimmc(Id, Iq, Vd, Vq, wm_ref, Te_ref, config: BimmcLossConfig):
     # per phase: P_on_phase = (\hat I_dq)**2 * Rdson / Npmos * Nsm (where Nsm - number of SMs per phase
     #                       = (\hat I_dq)**2 * Rdson / Npmos * Nsm
     # total: P_on_total     = 3 * (\hat I_dq)**2 * Rdson / Npmos * Nsm
-    Pmos_loss = 3 * (Id**2 + Iq**2) / Npmos * Rdson * Nsm
-
     # inverter switching losses
     # get the switching slopes from the user-defined functions or use the default values
     switching = config.switching
@@ -254,15 +255,22 @@ def calc_losses_bimmc(Id, Iq, Vd, Vq, wm_ref, Te_ref, config: BimmcLossConfig):
     # Esw_per_sw is per phase (4 * Nsm switches already included), so only x3 phases
     Psw_loss = 3 * Esw_per_sw * fsw  # [W]
 
-    # calculate the case and junction temperatures
-    Tc = (
-        thermal.ambient_temperature
-        + (Pmos_loss + Psw_loss) / (3 * Nsm * 4 * Npmos) * thermal.case_to_ambient
-    )  # [°C] case temperature
-    Tj = (
-        Tc
-        + (Pmos_loss + Psw_loss) / (3 * Nsm * 4 * Npmos) * thermal.junction_to_case
-    )  # [°C] junction temperature
+    # conduction losses; Rdson follows the junction temperature (fixed-point iteration)
+    Rdson0 = Rdson
+    for _ in range(config.rdson_iter if config.rdson_vs_tj is not None else 1):
+        Pmos_loss = 3 * (Id**2 + Iq**2) / Npmos * Rdson * Nsm
+        # calculate the case and junction temperatures
+        Tc = (
+            thermal.ambient_temperature
+            + (Pmos_loss + Psw_loss) / (3 * Nsm * 4 * Npmos) * thermal.case_to_ambient
+        )  # [°C] case temperature
+        Tj = (
+            Tc
+            + (Pmos_loss + Psw_loss) / (3 * Nsm * 4 * Npmos) * thermal.junction_to_case
+        )  # [°C] junction temperature
+        if config.rdson_vs_tj is not None:
+            # Tj is NaN at infeasible points: use the 25 °C value there
+            Rdson = Rdson0 * config.rdson_vs_tj(np.nan_to_num(Tj, nan=25.0))
 
     # battery losses
     Pbatt = np.zeros_like(Idq)
