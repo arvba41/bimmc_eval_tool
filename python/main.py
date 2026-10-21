@@ -12,6 +12,7 @@ from tqdm import tqdm
 from scipy.interpolate import interp1d
 
 import calc as daf
+import model
 import plots as dpf
 
 import time
@@ -139,6 +140,11 @@ with st.sidebar:
         Rdson_vs_Tj_rawdata = pd.read_csv(
             os.path.join("data", "Wolfspeed_MOSFET_Rdson_vs_Tj_data.csv")
         )
+        # 3rd order polynomial fit of the raw data, normalised to 1 at 25 °C
+        Rdson_Tj_fun = model.rdson_poly_fun(
+            model.fit_rdson_poly(Rdson_vs_Tj_rawdata),
+            (Rdson_vs_Tj_rawdata["Tj"].min(), Rdson_vs_Tj_rawdata["Tj"].max()),
+        )
     # elif which_mosfet == "CAB760M12HM3":
     # TODO: add the CAB760M12HM3 MOSFET device parameters and data
     # https://assets.wolfspeed.com/uploads/2024/01/Wolfspeed_CAB760M12HM3_data_sheet.pdf
@@ -184,12 +190,21 @@ with st.sidebar:
         Rth_jc_2l = st.number_input(
             "Thermal resistance junction-to-case [°C/W]", min_value=0.0, value=0.08
         )
-        Rdson_vs_Tj_rawdata = pd.DataFrame(
-            {
-                "Tj": [0, 25, 175],
-                "Rdson_normalized": [1, 1, 2],
-            }
+        st.markdown(
+            "Rdson(Tj) / Rdson(25 °C) as a 3rd order polynomial: "
+            "$c_3 T_j^3 + c_2 T_j^2 + c_1 T_j + c_0$ (Tj in °C)"
         )
+        Rdson_poly = [
+            st.number_input(
+                f"Rdson polynomial coefficient c{k}",
+                value=float(c),
+                format="%.6e",
+                key=f"rdson_poly_c{k}",
+            )
+            for k, c in zip((3, 2, 1, 0), model.RDSON_POLY_DEFAULT)
+        ]
+        Rdson_vs_Tj_rawdata = None  # no raw data: the user supplies the fit
+        Rdson_Tj_fun = model.rdson_poly_fun(Rdson_poly)
 
     else:
         raise ValueError("Selected MOSFET device is currently not supported.")
@@ -249,16 +264,6 @@ with st.sidebar:
         ),
     )
     Npmos_2l = np.ceil(Ibase / ImosRated)  # number of parallel MOSFETs [-]
-    Rdson_Tj_fun = interp1d(
-        Rdson_vs_Tj_rawdata["Tj"],
-        Rdson_vs_Tj_rawdata["Rdson_normalized"],
-        kind="linear",
-        bounds_error=False,
-        fill_value=(
-            Rdson_vs_Tj_rawdata["Rdson_normalized"].iloc[0],
-            Rdson_vs_Tj_rawdata["Rdson_normalized"].iloc[-1],
-        ),
-    )
     # NOTE: based on fig 24 in the datasheet, the rise/fall time accounts for about 50% of the switching energy, so a multiple by 2 is introduced to account for the total switching energy.
     # TODO: Esw(id, iq, Vd, Vq) \propto di/dt(id, iq, Vd, Vq) and dv/dt(id, iq, Vd, Vq),
 
