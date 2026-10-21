@@ -35,6 +35,10 @@ OCV = {
     "NaB": [3.9, 3.74, 3.61, 3.47, 3.29, 3.12, 2.99, 2.87, 2.75, 2.55, 2.22],
 }
 
+# SOC scaling polynomials [a2, a1, a0] for the Samsung PHEV2 24Ah cell
+CELL_POLY_R_DEFAULT = (1.3, -1.3, 1.3)
+CELL_POLY_C_DEFAULT = (-1.3, 1.3, 1.3)
+
 # Nominal user inputs (same defaults as the dashboard)
 NOMINAL = {
     # operating point / general
@@ -68,6 +72,10 @@ NOMINAL = {
     "Qcell": 24.0,  # [Ah]
     "R0_nom": 1.2e-3,  # [Ohm]
     "R1_nom": 0.7e-3,  # [Ohm]
+    # SOC scaling of R0, R1 and C1: 2nd order polynomials [a2, a1, a0] in SOC (0-1);
+    # R0 and R1 are scaled by poly_r, C1 by poly_c (defaults: Samsung PHEV2 24Ah)
+    "poly_r": CELL_POLY_R_DEFAULT,
+    "poly_c": CELL_POLY_C_DEFAULT,
     # BI-MMC
     "Nsm": 12,  # preferred number of submodules per phase (see "bimmc_sizing")
     "Nsm_redundant_pu": 0.0,
@@ -244,8 +252,8 @@ def cell_state(p, soc):
     """Cell OCV and equivalent-circuit parameters (R0, R1, C1) at the given SOC."""
     ocv = OCV[p["chemistry"]]
     Vcell = np.interp(soc, OCV["soc"][::-1], ocv[::-1])
-    poly_r = 1.3 * soc**2 - 1.3 * soc + 1.3
-    poly_c = -1.3 * soc**2 + 1.3 * soc + 1.3
+    poly_r = np.polyval(p.get("poly_r", CELL_POLY_R_DEFAULT), soc)
+    poly_c = np.polyval(p.get("poly_c", CELL_POLY_C_DEFAULT), soc)
     C1_nom = p.get("C1_nom") or 1 / (2 * np.pi * 250 * p["R1_nom"])
     return Vcell, p["R0_nom"] * poly_r, p["R1_nom"] * poly_r, C1_nom * poly_c
 

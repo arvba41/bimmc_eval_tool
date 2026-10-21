@@ -129,6 +129,8 @@ def battery_inputs(p):
         p["Qcell"] = 24.0
         p["R0_nom"] = 1.2e-3
         p["R1_nom"] = 0.7e-3
+        p["poly_r"] = model.CELL_POLY_R_DEFAULT
+        p["poly_c"] = model.CELL_POLY_C_DEFAULT
     else:
         p["Qcell"] = st.number_input("Cell capacity [Ah]", min_value=0.0, value=24.0)
         p["R0_nom"] = (
@@ -144,6 +146,23 @@ def battery_inputs(p):
             min_value=0.0,
             value=1 / (2 * np.pi * 250 * p["R1_nom"]),
         )
+        st.markdown(
+            "SOC dependence of the cell parameters (SOC in 0-1): R0 and R1 are scaled by "
+            "$a_2 SOC^2 + a_1 SOC + a_0$ and C1 by the corresponding polynomial"
+        )
+        for key, label, default in (
+            ("poly_r", "R0/R1", model.CELL_POLY_R_DEFAULT),
+            ("poly_c", "C1", model.CELL_POLY_C_DEFAULT),
+        ):
+            p[key] = [
+                st.number_input(
+                    f"{label} polynomial coefficient a{k}",
+                    value=float(c),
+                    format="%.4f",
+                    key=f"{key}_a{k}",
+                )
+                for k, c in zip((2, 1, 0), default)
+            ]
 
 
 def bimmc_inputs(p):
