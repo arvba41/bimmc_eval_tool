@@ -165,17 +165,24 @@ def plot_Rdson_vs_Tj(Rdson_vs_Tj_rawdata, Rdson_Tj_fun, save_path=None):
         # wide main area, so do not use the small paper-sized figure here.
         # figsize=(textwidth, textwidth / goldenratio),
     )
-    ax.scatter(
-        Rdson_vs_Tj_rawdata["Tj"],
-        Rdson_vs_Tj_rawdata["Rdson_normalized"],
-        label=r"$R_{ds(on)}$ vs $T_j$",
-        marker="x",
-    )
+    if Rdson_vs_Tj_rawdata is not None:  # customised MOSFETs only have the polynomial
+        ax.scatter(
+            Rdson_vs_Tj_rawdata["Tj"],
+            Rdson_vs_Tj_rawdata["Rdson_normalized"],
+            label=r"$R_{ds(on)}$ vs $T_j$",
+            marker="x",
+        )
     ax.set_xlabel(r"$T_j$ [°C]")
     ax.set_ylabel(r"$R_{ds(on)}$ [normalized]")
     # ax.set_ylim(0, 1.5)
     ax.legend(ncols=2, fontsize=8, loc="upper left")
-    ax.plot(Tj_vec, Rdson_Tj_fun(Tj_vec) / Rdson_Tj_fun(25), color="gray", ls="--")
+    ax.plot(
+        Tj_vec,
+        Rdson_Tj_fun(Tj_vec) / Rdson_Tj_fun(25),
+        color="gray",
+        ls="--",
+        label="3rd order polynomial fit",
+    )
     despine(fig=fig)
 
     if save_path is not None:

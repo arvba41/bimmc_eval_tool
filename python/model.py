@@ -122,23 +122,32 @@ def fit_rdson_poly(rdson_raw, degree=3):
     return np.polyfit(rdson_raw["Tj"], rdson_raw["Rdson_normalized"], degree)
 
 
+def mosfet_raw(p):
+    """Raw switching-slope table and Rdson(Tj) table (None for a customised MOSFET)."""
+    if p["mosfet"] == "Wolfspeed":
+        return (
+            pd.read_csv(DATA_DIR / "Wolfspeed_MOSFET_dvdt_didt_data.csv"),
+            pd.read_csv(DATA_DIR / "Wolfspeed_MOSFET_Rdson_vs_Tj_data.csv"),
+        )
+    ImosRated = p["ImosRated_RMS"] * np.sqrt(2)
+    raw = pd.DataFrame(
+        {
+            f"{k}_{ax}": ([0, ImosRated] if ax == "X" else [p[f"{k}_2l"]] * 2)
+            for k in ("didt_on", "didt_off", "dvdt_on", "dvdt_off")
+            for ax in ("X", "Y")
+        }
+    )
+    return raw, None
+
+
 def mosfet_data(p):
     """Switching slopes and normalised Rdson(Tj) function of the 2L MOSFET."""
-    ImosRated = p["ImosRated_RMS"] * np.sqrt(2)
-    if p["mosfet"] == "Wolfspeed":
-        raw = pd.read_csv(DATA_DIR / "Wolfspeed_MOSFET_dvdt_didt_data.csv")
-        rdson_raw = pd.read_csv(DATA_DIR / "Wolfspeed_MOSFET_Rdson_vs_Tj_data.csv")
+    raw, rdson_raw = mosfet_raw(p)
+    if rdson_raw is not None:
         rdson_tj = rdson_poly_fun(
             fit_rdson_poly(rdson_raw), (rdson_raw["Tj"].min(), rdson_raw["Tj"].max())
         )
     else:
-        raw = pd.DataFrame(
-            {
-                f"{k}_{ax}": ([0, ImosRated] if ax == "X" else [p[f"{k}_2l"]] * 2)
-                for k in ("didt_on", "didt_off", "dvdt_on", "dvdt_off")
-                for ax in ("X", "Y")
-            }
-        )
         rdson_tj = rdson_poly_fun(p.get("Rdson_poly", RDSON_POLY_DEFAULT))
     slopes = daf.SwitchingSlopes(
         *[
@@ -234,10 +243,10 @@ def design(p) -> Design:
 def cell_state(p, soc):
     """Cell OCV and equivalent-circuit parameters (R0, R1, C1) at the given SOC."""
     ocv = OCV[p["chemistry"]]
-    Vcell = float(np.interp(soc, OCV["soc"][::-1], ocv[::-1]))
+    Vcell = np.interp(soc, OCV["soc"][::-1], ocv[::-1])
     poly_r = 1.3 * soc**2 - 1.3 * soc + 1.3
     poly_c = -1.3 * soc**2 + 1.3 * soc + 1.3
-    C1_nom = 1 / (2 * np.pi * 250 * p["R1_nom"])
+    C1_nom = p.get("C1_nom") or 1 / (2 * np.pi * 250 * p["R1_nom"])
     return Vcell, p["R0_nom"] * poly_r, p["R1_nom"] * poly_r, C1_nom * poly_c
 
 
@@ -269,7 +278,7 @@ def solve_mtpa(d: Design, vmax, wm_vec, T_vec, PBase):
     return Id, Iq
 
 
-def _dq_voltages(d: Design, Id, Iq, wm_vec):
+def dq_voltages(d: Design, Id, Iq, wm_vec):
     wr = np.asarray(wm_vec)[:, None] * d.motor.pole_pairs
     m = d.motor
     Vd = Id * m.stator_resistance - wr * m.q_axis_inductance * Iq
@@ -308,7 +317,7 @@ def loss_maps(p, soc, wm_vec, T_vec, voltage_limit="own", rdson_tj=True, rdson_i
 
     # --- two-level inverter
     slopes_2l, rdson_fun = mosfet_data(p)
-    Vd, Vq = _dq_voltages(d, Id_2l, Iq_2l, wm_vec)
+    Vd, Vq = dq_voltages(d, Id_2l, Iq_2l, wm_vec)
     thermal_2l = daf.ThermalParameters(p["Tambient"], p["Rth_jc_2l"], p["Rth_ca_2l"])
     battery_2l = daf.BatteryParameters(R0, R1, C1, d.Nscells_2l, d.Npcells_2l)
     Rdson = p["Rdson_2l"]
@@ -333,7 +342,7 @@ def loss_maps(p, soc, wm_vec, T_vec, voltage_limit="own", rdson_tj=True, rdson_i
             Rdson = p["Rdson_2l"] * rdson_fun(np.nan_to_num(Tj_2l, nan=25.0))
 
     # --- BI-MMC
-    Vd_b, Vq_b = _dq_voltages(d, Id_b, Iq_b, wm_vec)
+    Vd_b, Vq_b = dq_voltages(d, Id_b, Iq_b, wm_vec)
     fsw_b = p["mf_bimmc"] * wm_vec[:, None] * d.motor.pole_pairs / (2 * np.pi)
     fsw_b = np.broadcast_to(fsw_b, Id_b.shape)
     Pc_b, Ps_b, Pb_b, Tj_b, Tc_b = daf.calc_losses_bimmc(
