@@ -590,6 +590,19 @@ def plot_Tc_and_Tj(data: TemperatureMapData, options: PlotOptions = PlotOptions(
     return fig
 
 
+def _contourf_difference(ax, x, y, diff, levels=21):
+    """Filled contours of a BI-MMC-vs-2L difference, positive = BI-MMC better.
+
+    Diverging colormap centred on zero: blue where the BI-MMC has lower losses (higher
+    efficiency), red where it has higher losses (lower efficiency).
+    """
+    vmax = float(np.nanmax(np.abs(diff))) if np.any(np.isfinite(diff)) else 0.0
+    vmax = vmax if vmax > 0 else 1.0
+    return ax.contourf(
+        x, y, diff, levels=np.linspace(-vmax, vmax, levels), cmap="RdBu", extend="both"
+    )
+
+
 def plot_total_loss_comparison(
     data: TotalLossMapData_comparison, options: PlotOptions = PlotOptions()
 ):
@@ -657,12 +670,9 @@ def plot_total_loss_comparison(
         loc="left",
     )
 
-    ax[2].contourf(
-        wm_ref_vec,
-        Tau_ref_vec,
-        (total_loss_case_1 - total_loss_case_2).T / 1e3,
-        levels=50,
-        cmap="viridis",
+    # case 1 = 2L, case 2 = BI-MMC: positive (blue) = BI-MMC has lower losses
+    _contourf_difference(
+        ax[2], wm_ref_vec, Tau_ref_vec, (total_loss_case_1 - total_loss_case_2).T / 1e3
     )
     cl = ax[2].contour(
         wm_ref_vec,
@@ -751,12 +761,9 @@ def plot_total_efficiency_comparison(
         loc="left",
     )
 
-    ax[2].contourf(
-        wm_ref_vec,
-        Tau_ref_vec,
-        (eff_case_2 - eff_case_1).T * 100,
-        levels=50,
-        cmap="viridis",
+    # positive (blue) = BI-MMC has higher efficiency
+    _contourf_difference(
+        ax[2], wm_ref_vec, Tau_ref_vec, (eff_case_2 - eff_case_1).T * 100
     )
     cl = ax[2].contour(
         wm_ref_vec,
@@ -844,13 +851,8 @@ def plot_individual_loss_comparison(
         else:
             diff = (data_case_1 - data_case_2).T * scale
             label_first, label_second = label_case_1, label_case_2
-        cf = ax[ii].contourf(
-            wm_ref_vec,
-            Tau_ref_vec,
-            diff,
-            levels=50,
-            cmap="viridis",
-        )
+        # blue = BI-MMC better (lower loss / higher efficiency), red = worse
+        cf = _contourf_difference(ax[ii], wm_ref_vec, Tau_ref_vec, diff)
         cl = ax[ii].contour(
             wm_ref_vec,
             Tau_ref_vec,
