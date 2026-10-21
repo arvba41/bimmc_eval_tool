@@ -124,7 +124,7 @@ def feasible_torque(solver, d, wm, T_req, vmax):
 
 
 def losses_2l(p, d, mosfet, cell, wm, Id, Iq, rdson_iter=5):
-    """Pc, Ps, Pb [W] and Tj [degC] of the 2L inverter and its battery at one point."""
+    """Pc, Ps, Pb [W], Tj and Tc [degC] of the 2L inverter and its battery at one point."""
     slopes, rdson_fun = mosfet
     Vcell, R0, R1, C1 = cell
     V_dc = Vcell * d.Nscells_2l
@@ -134,7 +134,7 @@ def losses_2l(p, d, mosfet, cell, wm, Id, Iq, rdson_iter=5):
     battery = daf.BatteryParameters(R0, R1, C1, d.Nscells_2l, d.Npcells_2l)
     Rdson = p["Rdson_2l"]
     for _ in range(rdson_iter):  # fixed point Tj -> Rdson(Tj) -> Pcond -> Tj
-        Pc, Ps, Pb, Tj, _ = daf.calc_losses_2l(
+        Pc, Ps, Pb, Tj, Tc = daf.calc_losses_2l(
             Id,
             Iq,
             Vd,
@@ -150,17 +150,23 @@ def losses_2l(p, d, mosfet, cell, wm, Id, Iq, rdson_iter=5):
             ),
         )
         Rdson = p["Rdson_2l"] * rdson_fun(Tj)
-    return float(Pc[0, 0]), float(Ps[0, 0]), float(Pb[0, 0]), float(Tj[0, 0])
+    return (
+        float(Pc[0, 0]),
+        float(Ps[0, 0]),
+        float(Pb[0, 0]),
+        float(Tj[0, 0]),
+        float(Tc[0, 0]),
+    )
 
 
 def losses_bimmc(p, d, cell, wm, T, Id, Iq):
-    """Pc, Ps, Pb [W] and Tj [degC] of the BI-MMC and its battery at one point."""
+    """Pc, Ps, Pb [W], Tj and Tc [degC] of the BI-MMC and its battery at one point."""
     Vcell, R0, R1, C1 = cell
     wm_eff = max(wm, MIN_FSW_BIMMC * 2 * np.pi / (p["mf_bimmc"] * d.motor.pole_pairs))
     Vs_b = Vcell * d.Nscells_b
     Id, Iq = np.array([[Id]]), np.array([[Iq]])
     Vd, Vq = model.dq_voltages(d, Id, Iq, [wm_eff])
-    Pc, Ps, Pb, Tj, _ = daf.calc_losses_bimmc(
+    Pc, Ps, Pb, Tj, Tc = daf.calc_losses_bimmc(
         Id,
         Iq,
         Vd,
@@ -192,7 +198,13 @@ def losses_bimmc(p, d, cell, wm, T, Id, Iq):
             rdson_vs_tj=model.bimmc_rdson_fun(p),
         ),
     )
-    return float(Pc[0, 0]), float(Ps[0, 0]), float(Pb[0, 0]), float(Tj[0, 0])
+    return (
+        float(Pc[0, 0]),
+        float(Ps[0, 0]),
+        float(Pb[0, 0]),
+        float(Tj[0, 0]),
+        float(Tc[0, 0]),
+    )
 
 
 # ----------------------------------------------------------------------------
@@ -232,7 +244,7 @@ def evaluate_cycle(app_key, soc0, rdson_iter=5):
         }
         if abs(T_req) < 1e-9 and wm < 1e-9:  # standstill without torque: converter off
             T, ok = 0.0, True
-            out = {c: (0.0, 0.0, 0.0, p["Tambient"]) for c in CONVERTERS}
+            out = {c: (0.0, 0.0, 0.0, p["Tambient"], p["Tambient"]) for c in CONVERTERS}
         else:
             # the voltage limit follows the cell voltage, i.e. the present SOC
             vmax = {
@@ -264,16 +276,20 @@ def evaluate_cycle(app_key, soc0, rdson_iter=5):
                     ),
                 }
             else:  # no feasible current at this SOC and speed: losses not available
-                out = {c: (0.0, 0.0, 0.0, np.nan) for c in CONVERTERS}
+                out = {c: (0.0, 0.0, 0.0, np.nan, np.nan) for c in CONVERTERS}
         P = wm * T
         row.update({"T": T, "P": P, "infeasible": not ok})
         for c in CONVERTERS:
-            Pc, Ps, Pb, Tj = out[c]
-            row.update({f"Pc_{c}": Pc, f"Ps_{c}": Ps, f"Pb_{c}": Pb, f"Tj_{c}": Tj})
+            Pc, Ps, Pb, Tj, Tc = out[c]
+            row.update(
+                {f"Pc_{c}": Pc, f"Ps_{c}": Ps, f"Pb_{c}": Pb, f"Tj_{c}": Tj, f"Tc_{c}": Tc}
+            )
             row[f"Ploss_{c}"] = Pc + Ps + Pb
             # steady-state cell temperature (no thermal capacitance), bottom-cooled and
             # side-insulated cells, see model.CELL_THERMAL_DEFAULT
-            row[f"Tcell_{c}"] = model.cell_temperature(p, Pb, n_cells[c])
+            row[f"Tcell_{c}"] = (
+                model.cell_temperature(p, Pb, n_cells[c]) if ok else np.nan
+            )
             # power drawn from the cells' open-circuit source (negative = charging)
             I_cell = (P + Pc + Ps + Pb) / (n_cells[c] * cell[c][0])
             soc[c] = float(
@@ -323,7 +339,8 @@ def evaluate_cycle(app_key, soc0, rdson_iter=5):
             res[f"E_{c}_{conv}_kWh"] = E(trace[f"{c}_{conv}"].to_numpy())
             total += res[f"E_{c}_{conv}_kWh"]
         res[f"E_loss_{conv}_kWh"] = total
-        res[f"Tcell_max_{conv}"] = float(np.nanmax(trace[f"Tcell_{conv}"]))
+        for T in ("Tj", "Tc", "Tcell"):  # peak temperatures over the cycle [degC]
+            res[f"{T}_max_{conv}"] = float(np.nanmax(trace[f"{T}_{conv}"]))
         # losses charged to the traction energy (motoring + regeneration throughput)
         res[f"eta_cycle_{conv}"] = 1 - total / (
             res["E_motoring_kWh"] + res["E_regen_kWh"]

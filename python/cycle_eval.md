@@ -53,6 +53,8 @@ Columns of the trace (`<c>` is `2l` or `bimmc`):
 | `Pc_<c>`, `Ps_<c>`, `Pb_<c>` | W | conduction, switching, battery loss |
 | `Ploss_<c>` | W | `Pc + Ps + Pb` |
 | `Tj_<c>` | °C | junction temperature from the steady-state thermal model |
+| `Tc_<c>` | °C | MOSFET case temperature (2L inverter and BI-MMC) |
+| `Tcell_<c>` | °C | steady-state cell temperature of the battery (bottom-cooled, side-insulated cells, `model.cell_temperature`); NaN at infeasible steps |
 | `infeasible` | – | `True` if no MTPA solution exists at that point (losses set to 0) |
 
 ---
@@ -140,8 +142,8 @@ Instantaneous 2L losses at one operating point, using `daf.calc_losses_2l`.
 | `_dq_voltages` | d/q voltages from the machine equations (`R·I` plus the speed-voltage terms) |
 | `thermal`, `battery` | parameter containers for `calc_losses_2l`; the battery gets `R0, R1, C1` of the present SOC |
 | loop `rdson_iter` | the conduction loss depends on `Rdson(Tj)` and `Tj` depends on the loss. The fixed-point iteration `Tj → Rdson → Pcond → Tj` is repeated 5 times, starting with the 25 °C datasheet value |
-| `daf.calc_losses_2l` | returns conduction `Pc`, switching `Ps`, battery `Pb`, `Tj` and `Tc` (case temperature, not used here) |
-| return | four floats: `Pc, Ps, Pb` [W], `Tj` [°C] |
+| `daf.calc_losses_2l` | returns conduction `Pc`, switching `Ps`, battery `Pb`, `Tj` and `Tc` (case temperature) |
+| return | five floats: `Pc, Ps, Pb` [W], `Tj, Tc` [°C] |
 
 ### 3.9 `losses_bimmc(p, d, cell, wm, T, Id, Iq)` (lines 144–174)
 Instantaneous BI-MMC losses with `daf.calc_losses_bimmc`.
@@ -153,7 +155,7 @@ Instantaneous BI-MMC losses with `daf.calc_losses_bimmc`.
 | `_dq_voltages` | d/q voltages at `wm_eff` |
 | `calc_losses_bimmc(...)` | called with 1×1 arrays and one-element speed/torque vectors. It uses `Nsm`, the redundancy, `Vs_b`, `Rdson`, the number of parallel MOSFETs, `fsw = mf·we/2π`, thermal parameters, switching slopes and the battery parameters at the present SOC |
 | battery loss | inside `calc_losses_bimmc` the cell RC network is simulated over two electrical cycles with the actual submodule gating (carrier vs. reference) and the average of the second cycle is used |
-| return | four floats: `Pc, Ps, Pb` [W], `Tj` [°C] |
+| return | five floats: `Pc, Ps, Pb` [W], `Tj, Tc` [°C] |
 
 ### 3.10 `evaluate_cycle(app_key, soc0, rdson_iter=5)` (lines 177–281)
 The main routine. Returns `(summary dict, trace DataFrame)`.
