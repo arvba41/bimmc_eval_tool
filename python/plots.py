@@ -871,4 +871,7 @@ def plot_individual_loss_comparison(
 
     despine(fig=fig)
 
+    if options.save_path is not None:
+        fig.savefig(options.save_path, dpi=200)
+
     return fig
