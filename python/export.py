@@ -1,11 +1,12 @@
 """Export of the data behind the dashboard plots to one Excel workbook.
 
 Every sheet holds the data of one figure (or group of figures). Speed-torque maps are
-written in long format: one row per (speed, torque) grid point and one column per plotted
-quantity, so each column can be reshaped into the map shown in the figure. NaN (points that
-are infeasible or not plotted, e.g. efficiency below the plot threshold) are left empty.
+written as one block per plotted quantity (torque in rows, speed in columns), stacked
+vertically in the sheet of their figure. Points that are infeasible or not plotted (e.g.
+efficiency below the plot threshold) are left empty.
 """
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -16,18 +17,51 @@ import plots as dpf
 SHEET_NAME_MAX = 31  # Excel limit
 
 
-def map_frame(operating_map: dpf.OperatingMap, **quantities) -> pd.DataFrame:
-    """Long-format table of speed x torque maps; each array has shape (speed, torque)."""
-    speed, torque = np.meshgrid(
-        operating_map.speed_rpm, operating_map.torque_nm, indexing="ij"
+@dataclass(frozen=True)
+class MapSheet:
+    """Speed-torque maps of one sheet: name -> array of shape (speed, torque)."""
+
+    operating_map: dpf.OperatingMap
+    quantities: dict[str, np.ndarray]
+
+
+def map_frame(operating_map: dpf.OperatingMap, **quantities) -> MapSheet:
+    return MapSheet(
+        operating_map,
+        {name: np.asarray(values, dtype=float) for name, values in quantities.items()},
     )
-    columns = {"speed_rpm": speed.ravel(), "torque_Nm": torque.ravel()}
-    for name, values in quantities.items():
-        columns[name] = np.asarray(values, dtype=float).ravel()
-    return pd.DataFrame(columns)
 
 
-def mtpa_frames(data: dpf.MtpaMapData) -> dict[str, pd.DataFrame]:
+def _write_map_sheet(sheet, data: MapSheet):
+    """One block per quantity, stacked vertically: torque in rows, speed in columns.
+
+    Layout of a block (r = first row, columns from C):
+        r      D: "speed_rpm"
+        r+1    D..: speed values                      | name of the quantity after the last
+        r+2..  C: torque value, D..: values           | speed column
+        B (middle row): "torque_Nm"
+    """
+    speed = np.asarray(data.operating_map.speed_rpm, dtype=float)
+    torque = np.asarray(data.operating_map.torque_nm, dtype=float)
+    row = 1
+    for name, values in data.quantities.items():
+        sheet.cell(row, 4, "speed_rpm")
+        for i, w in enumerate(speed):
+            sheet.cell(row + 1, 4 + i, float(w))
+        sheet.cell(row + 1, 4 + len(speed), name)
+        sheet.cell(row + 2 + len(torque) // 2, 2, "torque_Nm")
+        for j, T in enumerate(torque):
+            sheet.cell(row + 2 + j, 3, float(T))
+            for i in range(len(speed)):
+                v = values[i, j]
+                if np.isfinite(v):  # infeasible / not plotted points stay empty
+                    sheet.cell(row + 2 + j, 4 + i, float(v))
+        row += len(torque) + 4  # one empty row between the blocks
+    sheet.column_dimensions["B"].width = 11
+    sheet.column_dimensions["C"].width = 11
+
+
+def mtpa_frames(data: dpf.MtpaMapData) -> dict[str, MapSheet]:
     """Data of plot_mtpa_maps and plot_mtpa_maps_dqs (same normalisation as the plots)."""
     Id, Iq, Vd, Vq = data.id_current, data.iq_current, data.d_voltage, data.q_voltage
     Vdc, Ibase = data.dc_voltage, data.base_current
@@ -48,7 +82,7 @@ def mtpa_frames(data: dpf.MtpaMapData) -> dict[str, pd.DataFrame]:
     }
 
 
-def converter_frames(key, conv, operating_map) -> dict[str, pd.DataFrame]:
+def converter_frames(key, conv, operating_map) -> dict[str, MapSheet]:
     """Loss, temperature and efficiency maps of one converter ('2l' or 'bimmc')."""
     tag = {"2l": "2L", "bimmc": "BIMMC"}[key]
     eff_c, eff_s, eff_b, eff_tot = conv["eff"]
@@ -76,7 +110,7 @@ def converter_frames(key, conv, operating_map) -> dict[str, pd.DataFrame]:
     }
 
 
-def comparison_frames(c2l, cb, operating_map) -> dict[str, pd.DataFrame]:
+def comparison_frames(c2l, cb, operating_map) -> dict[str, MapSheet]:
     """Data of the 2L vs BI-MMC comparison plots (positive difference = BI-MMC better)."""
     parts = ("Pc", "Ps", "Pb")
     names = ("conduction", "switching", "battery")
@@ -104,13 +138,17 @@ def comparison_frames(c2l, cb, operating_map) -> dict[str, pd.DataFrame]:
     }
 
 
-def write_workbook(path, sheets: dict[str, pd.DataFrame]) -> Path:
-    """Write the sheets to an .xlsx file (the first sheet is usually the parameter list)."""
+def write_workbook(path, sheets: dict[str, pd.DataFrame | MapSheet]) -> Path:
+    """Write the sheets to an .xlsx file: tables as columns, MapSheets as torque x speed grids."""
     path = Path(path)
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
-        for name, frame in sheets.items():
-            frame.to_excel(writer, sheet_name=name[:SHEET_NAME_MAX], index=False)
-            sheet = writer.sheets[name[:SHEET_NAME_MAX]]
+        for name, data in sheets.items():
+            name = name[:SHEET_NAME_MAX]
+            if isinstance(data, MapSheet):
+                _write_map_sheet(writer.book.create_sheet(name), data)
+                continue
+            data.to_excel(writer, sheet_name=name, index=False)
+            sheet = writer.sheets[name]
             for col in sheet.columns:  # readable column widths
                 width = max(len(str(cell.value)) for cell in col[:50] if cell.value is not None)
                 sheet.column_dimensions[col[0].column_letter].width = min(width + 2, 45)
