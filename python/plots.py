@@ -59,6 +59,7 @@ class TemperatureMapData:
     junction_c: np.ndarray
     case_c: np.ndarray
     operating_map: OperatingMap
+    cell_c: np.ndarray | None = None  # steady-state cell temperature (optional panel)
 
 
 @dataclass(frozen=True)
@@ -541,7 +542,7 @@ def plot_Tc_and_Tj(data: TemperatureMapData, options: PlotOptions = PlotOptions(
     PBase, TBase = operating_map.base_power_w, operating_map.base_torque_nm
 
     fig, ax = plt.subplots(
-        2,
+        2 if data.cell_c is None else 3,
         1,
         # figsize=(textwidth, textwidth / goldenratio * 1.2),
         sharex=True,
@@ -568,8 +569,18 @@ def plot_Tc_and_Tj(data: TemperatureMapData, options: PlotOptions = PlotOptions(
     ax[1].clabel(cl, inline=True, fontsize=8)
     ax[1].plot(wm_ref_vec, Tmax, "r--")
     ax[1].set_ylabel(r"$\tau_e$ [Nm]")
-    ax[1].set_xlabel(r"$\omega_m$ [rpm]")
     ax[1].set_title(r"$T_\mathrm{j}$ [°C]", fontsize=8, loc="left")
+
+    if data.cell_c is not None:
+        ax[2].contourf(wm_ref_vec, Tau_ref_vec, data.cell_c.T, levels=50, cmap="viridis")
+        cl = ax[2].contour(
+            wm_ref_vec, Tau_ref_vec, data.cell_c.T, levels=5, colors="k", linewidths=0.5
+        )
+        ax[2].clabel(cl, inline=True, fontsize=8)
+        ax[2].plot(wm_ref_vec, Tmax, "r--")
+        ax[2].set_ylabel(r"$\tau_e$ [Nm]")
+        ax[2].set_title(r"$T_\mathrm{cell}$ [°C]", fontsize=8, loc="left")
+    ax[-1].set_xlabel(r"$\omega_m$ [rpm]")
 
     despine(fig=fig)
 

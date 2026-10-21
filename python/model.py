@@ -40,6 +40,16 @@ OCV = {
 CELL_POLY_R_DEFAULT = (1.3, -1.3, 1.3)
 CELL_POLY_C_DEFAULT = (-1.3, 1.3, 1.3)
 
+# Cell thermal model (steady state): Rth_cell = lz / (kz * Az).
+# ASSUMPTION: all cells are cooled from the bottom and are completely insulated on the
+# sides, i.e. the cell heat flows one-dimensionally through the thickness lz to the
+# coolant (taken at the ambient temperature) and there is no cell-to-cell heat exchange.
+CELL_THERMAL_DEFAULT = {
+    "lz_cell": 0.027,
+    "kz_cell": 25.0,
+    "Az_cell": 0.003996,
+}  # m, W/mK, m^2
+
 # Nominal user inputs (same defaults as the dashboard)
 NOMINAL = {
     # operating point / general
@@ -77,6 +87,7 @@ NOMINAL = {
     # R0 and R1 are scaled by poly_r, C1 by poly_c (defaults: Samsung PHEV2 24Ah)
     "poly_r": CELL_POLY_R_DEFAULT,
     "poly_c": CELL_POLY_C_DEFAULT,
+    **CELL_THERMAL_DEFAULT,  # thickness [m], conductivity [W/mK], area [m^2] for Rth_cell
     # BI-MMC
     "Nsm": 12,  # preferred number of submodules per phase (see "bimmc_sizing")
     "Nsm_redundant_pu": 0.0,
@@ -105,7 +116,12 @@ RDSON_POLY_DEFAULT = (9.43462740e-12, 2.99523011e-05, 5.77104581e-04, 9.67661695
 
 
 # 3rd order fit [c3 .. c0] of the Infineon IQDH29NE2LM5CGSC datasheet data
-RDSON_POLY_BIMMC_DATASHEET = (1.25942161e-08, 5.42696885e-06, 3.02535971e-03, 9.21144458e-01)
+RDSON_POLY_BIMMC_DATASHEET = (
+    1.25942161e-08,
+    5.42696885e-06,
+    3.02535971e-03,
+    9.21144458e-01,
+)
 
 
 def _table_function(x, y):
@@ -158,7 +174,9 @@ def mosfet_raw(p):
 
 def bimmc_rdson_raw():
     """Raw normalised Rdson(Tj) data of the Infineon IQDH29NE2LM5CGSC (BI-MMC MOSFET)."""
-    return pd.read_csv(DATA_DIR / "Infineon_MOSFET_IQDH29NE2LM5CGSC_Rdson_vs_Tj_data.csv")
+    return pd.read_csv(
+        DATA_DIR / "Infineon_MOSFET_IQDH29NE2LM5CGSC_Rdson_vs_Tj_data.csv"
+    )
 
 
 @lru_cache(maxsize=1)
@@ -277,6 +295,19 @@ def design(p) -> Design:
         # Imax_mosfet is an RMS rating; Ibase is a peak current
         Npmos_b=max(int(np.ceil(Ibase / (p["Imax_mosfet"] * np.sqrt(2)))), 4),
     )
+
+
+def cell_rth(p):
+    """Thermal resistance of one cell [K/W]: lz / (kz * Az), bottom-cooled and side-insulated
+    (see CELL_THERMAL_DEFAULT)."""
+    c = {k: p.get(k, v) for k, v in CELL_THERMAL_DEFAULT.items()}
+    return c["lz_cell"] / (c["kz_cell"] * c["Az_cell"])
+
+
+def cell_temperature(p, Pbatt, n_cells):
+    """Steady-state cell temperature [°C] for the battery loss Pbatt [W] shared equally by
+    n_cells cells; the cooled (bottom) side is at the ambient temperature."""
+    return p["Tambient"] + Pbatt / n_cells * cell_rth(p)
 
 
 def cell_state(p, soc):
@@ -441,6 +472,8 @@ def loss_maps(p, soc, wm_vec, T_vec, voltage_limit="own", rdson_tj=True, rdson_i
         "Pb_bimmc": Pb_b,
         "Tj_bimmc": Tj_b,
         "Tc_bimmc": Tc_b,
+        "Tcell_2l": cell_temperature(p, Pb_2l, d.Nscells_2l * d.Npcells_2l),
+        "Tcell_bimmc": cell_temperature(p, Pb_b, 3 * d.Nsm * d.Nscells_b * d.Npcells_b),
         "thermal_ok_bimmc": thermal_ok_b,
     }
 

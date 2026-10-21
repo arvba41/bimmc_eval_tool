@@ -131,6 +131,7 @@ def battery_inputs(p):
         p["R1_nom"] = 0.7e-3
         p["poly_r"] = model.CELL_POLY_R_DEFAULT
         p["poly_c"] = model.CELL_POLY_C_DEFAULT
+        p.update(model.CELL_THERMAL_DEFAULT)
     else:
         p["Qcell"] = st.number_input("Cell capacity [Ah]", min_value=0.0, value=24.0)
         p["R0_nom"] = (
@@ -145,6 +146,29 @@ def battery_inputs(p):
             "Cell RC branch capacitance C1 [F]",
             min_value=0.0,
             value=1 / (2 * np.pi * 250 * p["R1_nom"]),
+        )
+        # ASSUMPTION (see model.CELL_THERMAL_DEFAULT): all cells are cooled from the bottom
+        # and are completely insulated on the sides.
+        st.markdown(
+            "Cell thermal resistance $R_{th} = l_z / (k_z A_z)$. Assumption: all cells are "
+            "cooled from the bottom and are completely insulated on the sides."
+        )
+        p["lz_cell"] = st.number_input(
+            "Cell thickness lz in the cooling direction [m]",
+            min_value=1e-6,
+            value=model.CELL_THERMAL_DEFAULT["lz_cell"],
+            format="%.4f",
+        )
+        p["kz_cell"] = st.number_input(
+            "Cell thermal conductivity kz [W/mK]",
+            min_value=1e-6,
+            value=model.CELL_THERMAL_DEFAULT["kz_cell"],
+        )
+        p["Az_cell"] = st.number_input(
+            "Cell cooled (bottom) area Az [m²]",
+            min_value=1e-9,
+            value=model.CELL_THERMAL_DEFAULT["Az_cell"],
+            format="%.6f",
         )
         st.markdown(
             "SOC dependence of the cell parameters (SOC in 0-1): R0 and R1 are scaled by "
@@ -345,6 +369,7 @@ with tab1:
                 ("Battery energy", f"{p['Ebatt'] / 1e3:.0f} kWh"),
                 ("Selected battery chemistry", p["chemistry"]),
                 ("Cell capacity", f"{p['Qcell']:.0f} Ah"),
+                ("Cell thermal resistance (bottom-cooled, side-insulated)", f"{model.cell_rth(p):.2f} K/W"),
                 ("Number of series (equivalent) cells", d.Nscells_2l),
                 ("Number of parallel (equivalent) cells", d.Npcells_2l),
             ]
@@ -437,6 +462,7 @@ converters = {
         "Pb": res[f"Pb_{key}"],
         "Tj": res[f"Tj_{key}"],
         "Tc": res[f"Tc_{key}"],
+        "Tcell": res[f"Tcell_{key}"],
     }
     for key in ("2l", "bimmc")
 }
@@ -518,7 +544,9 @@ with tab3:
             )
             show(
                 dpf.plot_Tc_and_Tj(
-                    dpf.TemperatureMapData(conv["Tj"], conv["Tc"], operating_map),
+                    dpf.TemperatureMapData(
+                        conv["Tj"], conv["Tc"], operating_map, conv["Tcell"]
+                    ),
                     dpf.PlotOptions(
                         figure_number=fig_no + 1,
                         save_path=RESULTS_DIR / f"temperature_maps_{key}_{soc_tag}.png",
