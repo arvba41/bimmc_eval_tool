@@ -37,8 +37,10 @@ def _truck_vehicle():
         "wheel_radius": float(v["r_w"]),
         "gear_eff": 0.96,
         "v_top_kmh": 90.0,
-        "cruise_speed_kmh": 80.0,  # cruise speed maps to 1 pu machine speed
-        "cruise_pu": 1.0,
+        # sized so that the whole Södertälje-Norrköping run (peak 475 kW motoring on the
+        # steepest climbs, 1.1 kNm at the machine) stays inside the torque and power
+        # limits with >= 3 % margin: PBase 550 kW, feasible gear ratios 6.8 .. 16.8
+        "gear_ratio": 10.6,  # machine speed / wheel speed; 80 km/h = 1.5 pu base speed
         "source": "40 t tractor-semitrailer, so_no/vehicle_params.mat",
     }
 
@@ -67,7 +69,9 @@ APPLICATIONS = {
         label="Passenger car",
     ),
     "bus": _app(
-        {"PBase": 250e3, "wmBase": 2500.0, "Vdc": 700.0, "Ebatt": 350e3},
+        # PBase: Braunschweig needs 174 kW motoring and 318 kW regenerative peak power
+        # (the 1 Hz speed trace gives hard braking steps); 350 kW keeps >= 3 % margin
+        {"PBase": 350e3, "wmBase": 2500.0, "Vdc": 700.0, "Ebatt": 350e3},
         vehicle={
             "type": "road",
             "mass": 15000.0,  # [kg] 12 m bus, half load
@@ -77,13 +81,16 @@ APPLICATIONS = {
             "wheel_radius": 0.48,
             "gear_eff": 0.96,
             "v_top_kmh": 85.0,
+            # feasible gear ratios 17.6 .. 20.5 (peak torque 1.7 kNm at the machine for
+            # G = 13.8 exceeded the base torque); the cycle only reaches 58 km/h
+            "gear_ratio": 19.0,  # machine speed / wheel speed
             "source": "typical 12 m city bus",
         },
         cycle={"kind": "speed", "file": "braunschweig.csv", "name": "Braunschweig"},
         label="City bus",
     ),
     "truck": _app(
-        {},  # dashboard defaults: 400 kW, 400 kWh, 700 V
+        {"PBase": 550e3},  # other values are the dashboard defaults: 3000 rpm, 700 V, 400 kWh
         vehicle=_truck_vehicle(),
         cycle={
             "kind": "road",
@@ -156,13 +163,21 @@ E3_MODES = {
 def gear_ratio(app):
     """Machine speed / wheel speed.
 
-    If the vehicle defines "cruise_speed_kmh" and "cruise_pu", that speed maps to
+    If the vehicle defines "gear_ratio" it is used directly. If it defines
+    "cruise_speed_kmh" and "cruise_pu", that speed maps to
     cruise_pu times the base speed; otherwise v_top maps to 95 % of the maximum speed.
     """
     veh = app["vehicle"]
     d = model.design(app["params"])
+    if "gear_ratio" in veh:
+        return veh["gear_ratio"]
     if "cruise_pu" in veh:
-        return veh["cruise_pu"] * d.wmBase * veh["wheel_radius"] / (veh["cruise_speed_kmh"] / 3.6)
+        return (
+            veh["cruise_pu"]
+            * d.wmBase
+            * veh["wheel_radius"]
+            / (veh["cruise_speed_kmh"] / 3.6)
+        )
     return 0.95 * d.wmMax * veh["wheel_radius"] / (veh["v_top_kmh"] / 3.6)
 
 
