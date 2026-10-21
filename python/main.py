@@ -9,8 +9,10 @@ import time
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import streamlit as st
 
+import export as exporter
 import model
 import plots as dpf
 
@@ -634,3 +636,81 @@ with tab3:
                 ),
             )
         )
+
+# ------------------------------------------------------------------------------------
+# Export: the data of all plots in one Excel workbook
+# ------------------------------------------------------------------------------------
+Id_vec = np.linspace(0, 400, 100)  # same axes as the plots
+Tj_vec = np.linspace(-40, 175, 100)
+soc_vec = np.arange(0, 1.01, 0.01)
+slope_fits = pd.DataFrame(
+    {
+        "Id_A": Id_vec,
+        "didt_on_A_per_ns": slopes.didt_on(Id_vec),
+        "didt_off_A_per_ns": slopes.didt_off(Id_vec),
+        "dvdt_on_V_per_ns": slopes.dvdt_on(Id_vec),
+        "dvdt_off_V_per_ns": slopes.dvdt_off(Id_vec),
+    }
+)
+rdson_sheets = {}
+for name, raw, fun in (
+    ("Rdson_2L", Rdson_raw, Rdson_Tj_fun),
+    (
+        "Rdson_BIMMC",
+        model.bimmc_rdson_raw() if p["Rdson_poly_bimmc"] is None else None,
+        model.bimmc_rdson_fun(p),
+    ),
+):
+    fit = pd.DataFrame(
+        {"Tj_C_fit": Tj_vec, "Rdson_norm_fit": fun(Tj_vec) / fun(25)}
+    )
+    if raw is not None:
+        raw = raw.rename(columns={"Tj": "Tj_C_data", "Rdson_normalized": "Rdson_norm_data"})
+        fit = pd.concat([raw.reset_index(drop=True), fit], axis=1)
+    rdson_sheets[name] = fit
+cell_ocv = pd.DataFrame(
+    {"soc": model.OCV["soc"], f"ocv_{p['chemistry']}_V": model.OCV[p["chemistry"]]}
+)
+cell_rc = pd.DataFrame(
+    {
+        "soc": soc_vec,
+        "R0_mOhm": model.cell_state(p, soc_vec)[1] * 1e3,
+        "R1_mOhm": model.cell_state(p, soc_vec)[2] * 1e3,
+        "C1_F": model.cell_state(p, soc_vec)[3],
+    }
+)
+info = {k: (v if np.isscalar(v) or v is None else str(list(v))) for k, v in p.items()}
+info.update(
+    {
+        "soc_selected": soc,
+        "Vcell_V": Vcell,
+        "Nscells_2l": d.Nscells_2l,
+        "Npcells_2l": d.Npcells_2l,
+        "Nsm": d.Nsm,
+        "Nscells_bimmc": d.Nscells_b,
+        "Npcells_bimmc": d.Npcells_b,
+        "Npmos_2l": d.Npmos_2l,
+        "Npmos_bimmc": d.Npmos_b,
+        "cell_Rth_K_per_W": model.cell_rth(p),
+        "TBase_Nm": d.TBase,
+        "Ibase_A": d.Ibase,
+    }
+)
+sheets = {
+    "Parameters": pd.DataFrame({"parameter": list(info), "value": list(info.values())}),
+    "Switching_slopes_data": slopes_raw,
+    "Switching_slopes_fit": slope_fits,
+    **rdson_sheets,
+    "Cell_OCV": cell_ocv,
+    "Cell_RC_parameters": cell_rc,
+    **exporter.mtpa_frames(mtpa_map_data),
+    **exporter.converter_frames("2l", converters["2l"], operating_map),
+    **exporter.converter_frames("bimmc", converters["bimmc"], operating_map),
+    **exporter.comparison_frames(c2l, cb, operating_map),
+}
+xlsx_path = RESULTS_DIR / (
+    f"plot_data_{soc_tag}_PBase_{p['PBase'] / 1e3:.0f}kW_Ebatt_{p['Ebatt'] / 1e3:.0f}kWh.xlsx"
+)
+exporter.write_workbook(xlsx_path, sheets)
+with tab3:
+    st.caption(f"Data of all plots saved to `{xlsx_path}`")
