@@ -5,8 +5,7 @@ application of ``applications.py`` (PCIM figures).
 
 For every application the drive parameters (PBase, wmBase, Vdc, Ebatt, ...) are taken from
 ``applications.APPLICATIONS`` and the maps are computed exactly as in the dashboard
-(``main.py``): both converters use the 2L voltage limit, a constant Rdson and the BI-MMC
-sizing "ceil". The figures of ``plots.py`` are saved as PNG (and the plotted data as one
+(``main.py``): both converters use the 2L voltage limit, a constant Rdson. The figures of ``plots.py`` are saved as PNG (and the plotted data as one
 .xlsx workbook) in ``<out>/<application>/``.
 """
 
@@ -31,7 +30,6 @@ import plots as dpf
 EFF_MIN = 0.9  # efficiency values below this threshold are not plotted
 VOLTAGE_LIMIT = "2l"
 RDSON_TJ = False
-BIMMC_SIZING = "ceil"  # exactly Nsm submodules, cells per submodule rounded up
 RPM_PER_RADS = 60 / (2 * np.pi)
 DEFAULT_OUT = Path("results_PCIM")
 
@@ -51,7 +49,6 @@ def efficiency_maps(Pout, Pc, Ps, Pb):
 def application_params(app_key):
     """Dashboard parameters of an application (model.NOMINAL + the application overrides)."""
     p = dict(apps.APPLICATIONS[app_key]["params"])
-    p["bimmc_sizing"] = BIMMC_SIZING
     return p
 
 

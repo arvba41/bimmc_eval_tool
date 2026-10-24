@@ -1,0 +1,86 @@
+\section{Parameters and Data}\label{app:params}
+\Cref{tab:params} lists every entry of the parameter dictionary \code{model.NOMINAL} with the default value. The application presets override \code{PBase}, \code{wmBase}, \code{Vdc} and \code{Ebatt} (\cref{tab:machine}), and the car also \code{Nscells_b}. \Cref{tab:ocv} lists the open-circuit voltage tables, and \cref{tab:rdsonpoly} the Rdson polynomials.
+
+\begin{longtable}{@{}p{3.3cm}p{2.5cm}p{2.0cm}p{8.4cm}@{}}
+\caption{User-input dictionary \code{model.NOMINAL}.}\label{tab:params}\\
+\toprule
+Key & Default & Unit & Meaning \\
+\midrule
+\endfirsthead
+\toprule
+Key & Default & Unit & Meaning \\
+\midrule
+\endhead
+\multicolumn{4}{@{}l}{\emph{general}} \\
+\code{soc} & 0.5 & -- & operating SOC (sensitivity analysis) \\
+\multicolumn{4}{@{}l}{\emph{PMSM}} \\
+\code{pp} & 4 & -- & pole pairs $p$ \\
+\code{PBase} & 400\,000 & W & base power $P_\mathrm{b}$ \\
+\code{wmBase} & 3000 & rpm & base speed $n_\mathrm{b}$ \\
+\code{Vdc} & 700 & V & DC-link voltage $V_\mathrm{dc}$ \\
+\code{rs_pu}, \code{ld_pu}, \code{lq_pu} & 0.01, 0.55, 0.85 & pu & stator resistance, d- and q-axis inductance \\
+\multicolumn{4}{@{}l}{\emph{two-level inverter}} \\
+\code{mosfet} & "Wolfspeed" & -- & device data set ("Wolfspeed" or "custom") \\
+\code{fsw} & 10\,000 & Hz & carrier frequency $f_\mathrm{sw}$ \\
+\code{Rdson_2l} & 4.6\,m$\Omega$ & \si{\ohm} & on-resistance at \SI{25}{\celsius} (datasheet) \\
+\code{ImosRated_RMS} & 320 & A (RMS) & device current rating (sets $N_\mathrm{p,mos}$) \\
+\code{Rth_jc_2l}, \code{Rth_ca_2l} & 0.08, 0.05 & K/W & junction-to-case, case-to-ambient \\
+\code{Tjmax_2l}, \code{Tcmax_2l} & 175, 100 & \si{\celsius} & thermal limits (reported, not enforced) \\
+\code{Tambient} & 25 & \si{\celsius} & ambient (coolant) temperature \\
+\code{didt_on_2l}, \dots, \code{dvdt_off_2l} & 8, 15, 25, 25 & A/ns, V/ns & switching slopes, only for the custom device \\
+\multicolumn{4}{@{}l}{\emph{battery}} \\
+\code{chemistry} & "NMC" & -- & OCV table (NMC, LFP, LTO, NaB) \\
+\code{Ebatt} & 400\,000 & Wh & installed energy $E_\mathrm{b}$ \\
+\code{Qcell} & 24 & Ah & cell capacity \\
+\code{R0_nom}, \code{R1_nom} & 1.2, 0.7 & m$\Omega$ & nominal cell resistances \\
+\code{poly_r}, \code{poly_c} & (1.3,$-$1.3,1.3), ($-$1.3,1.3,1.3) & -- & SOC scaling polynomials $[a_2,a_1,a_0]$ of $R_0,R_1$ and $C_1$ \\
+\code{C1_nom} & $1/(2\pi\cdot250\,R_1)$ & F & optional; default gives a \SI{250}{\hertz} RC corner \\
+\code{lz_cell}, \code{kz_cell}, \code{Az_cell} & 0.027, 25, 0.003996 & m, W/mK, m$^2$ & cell thermal path (bottom cooled) \\
+\multicolumn{4}{@{}l}{\emph{BI-MMC}} \\
+\code{Nscells_b} & 10 & -- & series cells per submodule $\Nssm$ (input); $\Nsm$ follows \\
+\code{Nsm_redundant_pu} & 0 & pu & redundant SM share $r$ \\
+\code{Rdson_bimmc} & 0.3 & m$\Omega$ & on-resistance at \SI{25}{\celsius} \\
+\code{Rdson_poly_bimmc} & None & -- & optional cubic $[c_3..c_0]$; None uses the datasheet fit \\
+\code{Imax_mosfet} & 400 & A (RMS) & device rating (sets $N_\mathrm{p,mos}$, at least 4) \\
+\code{didt_on_bimmc}, \code{didt_off_bimmc} & 1, 1 & A/ns & constant switching slopes \\
+\code{dvdt_on_bimmc}, \code{dvdt_off_bimmc} & 0.5, 0.5 & V/ns & constant switching slopes \\
+\code{mf_bimmc} & 2 & -- & pulse number $m_\mathrm{f}$ ($f_\mathrm{c}=m_\mathrm{f}f_\mathrm{e}$) \\
+\code{Rth_jc_bimmc}, \code{Rth_ca_bimmc} & 0.5, 0.2 & K/W & junction-to-case, case-to-ambient \\
+\code{Tjmax_bimmc} & 175 & \si{\celsius} & junction limit (reported, not enforced) \\
+\bottomrule
+\end{longtable}
+
+\begin{table}[ht]
+\centering
+\caption{Cell open-circuit voltage [V] versus SOC (\code{model.OCV}); linear interpolation in between.}
+\label{tab:ocv}
+\footnotesize
+\setlength\tabcolsep{3pt}
+\begin{tabular}{@{}lrrrrrrrrrrr@{}}
+\toprule
+SOC & 1.0 & 0.9 & 0.8 & 0.7 & 0.6 & 0.5 & 0.4 & 0.3 & 0.2 & 0.1 & 0.0 \\
+\midrule
+NMC & 4.13 & 4.03 & 3.92 & 3.83 & 3.75 & 3.70 & 3.66 & 3.63 & 3.59 & 3.53 & 3.34 \\
+LFP & 3.39 & 3.33 & 3.31 & 3.32 & 3.31 & 3.29 & 3.27 & 3.26 & 3.25 & 3.18 & 2.89 \\
+LTO & 2.69 & 2.42 & 2.35 & 2.32 & 2.28 & 2.23 & 2.20 & 2.19 & 2.18 & 2.15 & 2.11 \\
+NaB & 3.90 & 3.74 & 3.61 & 3.47 & 3.29 & 3.12 & 2.99 & 2.87 & 2.75 & 2.55 & 2.22 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Cubic polynomials $\rho(\Tj)=c_3\Tj^3+c_2\Tj^2+c_1\Tj+c_0$ (\si{\celsius}); the code divides by $\rho(25)$. The Wolfspeed polynomial is the default of the custom device (\code{RDSON_POLY_DEFAULT}); for the Wolfspeed module the code re-fits the datasheet points at run time. The Infineon polynomial is \code{RDSON_POLY_BIMMC_DATASHEET}, also produced by \code{fit_rdson.py}.}
+\label{tab:rdsonpoly}
+\footnotesize
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+ & $c_3$ & $c_2$ & $c_1$ & $c_0$ \\
+\midrule
+Wolfspeed (default of custom) & $9.4346\times10^{-12}$ & $2.9952\times10^{-5}$ & $5.7710\times10^{-4}$ & $0.96766$ \\
+Infineon IQDH29NE2LM5CGSC & $1.2594\times10^{-8}$ & $5.4270\times10^{-6}$ & $3.0254\times10^{-3}$ & $0.92114$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Datasheet data.} The folder \code{data/} holds the digitised datasheet curves: switching slopes versus device current of the Wolfspeed module (\code{Wolfspeed_MOSFET_dvdt_didt_data.csv}, four curves with their own current axes), normalised $\Rds(\Tj)$ of the Wolfspeed module and of the Infineon device (two CSV files), and the duty cycles in \code{data/cycles/} with a README that records source, regulation, transformations and cross-checks of every file.

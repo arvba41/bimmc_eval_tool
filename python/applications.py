@@ -53,7 +53,8 @@ def _app(overrides, vehicle=None, cycle=None, label=""):
 
 APPLICATIONS = {
     "car": _app(
-        {"PBase": 150e3, "wmBase": 5000.0, "Vdc": 400.0, "Ebatt": 75e3},
+        # Nscells_b 7: the default of 10 would give 7 SMs and 20 % more cells than the 2L pack
+        {"PBase": 150e3, "wmBase": 5000.0, "Vdc": 400.0, "Ebatt": 75e3, "Nscells_b": 7},
         vehicle={
             "type": "road",
             "mass": 1900.0,  # [kg] incl. driver and some payload

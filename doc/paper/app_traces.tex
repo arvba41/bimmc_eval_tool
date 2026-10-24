@@ -1,0 +1,60 @@
+\section{Additional Results}\label{app:traces}
+\subsection*{Cycle results for all initial SOC values}
+\begin{table}[H]
+\centering
+\caption{Loss energies in kWh (conduction, switching, battery) and cycle efficiency of both drives for initial SOC of \SIlist{20;50;90}{\percent}.}
+\label{tab:resfull}
+\footnotesize
+\setlength\tabcolsep{3pt}
+\begin{tabular}{@{}lrrrrrrrrrr@{}}
+\toprule
+ & & \multicolumn{3}{c}{2L [kWh]} & \multicolumn{3}{c}{BI-MMC [kWh]} & \multicolumn{2}{c}{$\etacyc$ [\%]} & \\
+Application & SOC [\%] & $E_\mathrm{c}$ & $E_\mathrm{s}$ & $E_\mathrm{b}$ & $E_\mathrm{c}$ & $E_\mathrm{s}$ & $E_\mathrm{b}$ & 2L & BI & $\Delta\etacyc$ [pp] \\
+\midrule
+\input{tables/results_full}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{figures/paper_loss_energy.pdf}
+\caption{Cumulative loss energy along each cycle (\SI{50}{\percent} initial SOC): conduction (solid), switching (dotted) and battery (dashed) loss of the 2L inverter (blue) and the BI-MMC (orange).}
+\label{fig:lossenergy}
+\end{figure}
+
+\subsection*{Time series}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.88\linewidth]{figures/paper_trace_bus.pdf}
+\caption{Time series of the city bus (Braunschweig, \SI{50}{\percent} initial SOC). The speed spikes above base speed are short, but the regenerative torque peaks are large.}
+\end{figure}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.88\linewidth]{figures/paper_trace_offroad.pdf}
+\caption{Time series of the off-road machine (NRTC, \SI{50}{\percent} initial SOC).}
+\end{figure}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.88\linewidth]{figures/paper_trace_marine.pdf}
+\caption{Time series of the marine vessel (ISO 8178 E3 modes, \SI{50}{\percent} initial SOC): four steady modes.}
+\end{figure}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.88\linewidth]{figures/paper_trace_train.pdf}
+\caption{Time series of the regional train (synthetic run, \SI{50}{\percent} initial SOC). The requested regenerative torque exceeds the torque limit, so the delivered torque is lower.}
+\end{figure}
+
+\subsection*{Efficiency maps of the remaining applications}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.49\linewidth]{figures/maps/bus/efficiency_maps_comparison_soc_50.png}\hfill
+\includegraphics[width=0.49\linewidth]{figures/maps/marine/efficiency_maps_comparison_soc_50.png}
+\caption{Efficiency of the 2L inverter, the BI-MMC and their difference at \SI{50}{\percent} SOC for the city bus (left) and the marine vessel (right).}
+\end{figure}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.49\linewidth]{figures/maps/train/efficiency_maps_comparison_soc_50.png}\hfill
+\includegraphics[width=0.49\linewidth]{figures/maps/train/losses_maps_comparison_soc_50.png}
+\caption{Regional train at \SI{50}{\percent} SOC: efficiency of both drives and their difference (left), and total losses of both drives and their difference (right).}
+\end{figure}

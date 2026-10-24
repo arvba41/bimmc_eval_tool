@@ -1,0 +1,51 @@
+\section{Function Reference}\label{app:reference}
+This appendix lists the public functions of the package with their arguments, their results and the equation they implement. Units are SI unless stated.
+
+\subsection*{calc.py}
+\begin{description}\itemsep0pt
+\item[\code{MotorParameters}, \code{SwitchingSlopes}, \code{BatteryParameters}, \code{ThermalParameters}] Frozen dataclasses for the machine (\code{stator_resistance}, \code{d_axis_inductance}, \code{q_axis_inductance}, \code{magnet_flux}, \code{pole_pairs}), the slopes (constants or functions of the device current in A/ns, V/ns, floored at $10^{-6}$ to avoid a division by zero), the cell equivalent circuit ($R_0$, $R_1$, $C_1$, series and parallel cells), and the thermal network (ambient, $R_\mathrm{th,jc}$, $R_\mathrm{th,ca}$).
+\item[\code{TwoLevelLossConfig}, \code{BimmcLossConfig}] Configuration of the two loss functions: DC or SM voltage, on-resistance, parallel devices, switching frequency (scalar or array for the BI-MMC), battery, thermal network, slopes; the BI-MMC additionally has the SM count, redundancy, pole pairs, an optional $\rho(\Tj)$ function and the number of fixed-point steps.
+\item[\code{create_mtpa_optimization_problem(motor)}] Builds the CasADi \code{Opti} problem of \cref{eq:mtpa}; returns \code{(opti, x, (Tau_ref, wm_ref, vmax))}, with the three parameters set by the caller. Solver: IPOPT, print level 0.
+\item[\code{calc_losses_2l(Id, Iq, Vd, Vq, config)}] \cref{eq:pc2l,eq:times,eq:ps2l,eq:thermal2l,eq:pb2l}; arrays or scalars; returns \code{(Pmos_loss, Psw_loss, Pbatt, Tj, Tc)} in W and \si{\celsius}.
+\item[\code{calc_losses_bimmc(Id, Iq, Vd, Vq, wm_ref, Te_ref, config)}] \cref{eq:pcbimmc,eq:psbimmc,eq:io,eq:vref,eq:gate,eq:ib,eq:smrc,eq:rcsim,eq:pbbimmc} on a (speed $\times$ torque) array; \code{wm_ref} is the mechanical speed vector, \code{Te_ref} the torque vector (only its length is used). Rows with $\omega_\mathrm{e}\le0$ and NaN points return NaN battery loss. Returns the same five outputs.
+\item[\code{batterymdel(ib, R0, R1, C1, Vc)}, \code{simulate_battery_loss(ib_profile, tvec, R0, R1, C1, t_avg_start)}] Numba-compiled right-hand side of \cref{eq:rcsim} and the explicit-Euler integration; the average loss is taken for $t\ge t_\mathrm{avg,start}$.
+\end{description}
+
+\subsection*{model.py}
+\begin{description}\itemsep0pt
+\item[\code{NOMINAL}, \code{OCV}] Default inputs (\cref{tab:params}) and OCV tables (\cref{tab:ocv}).
+\item[\code{design(p)} $\to$ \code{Design}] \cref{eq:base1,eq:base2,eq:base3,eq:wmax,eq:pack2l,eq:npsm} and the parallel device counts; raises \code{ValueError} if $L_\mathrm{d}I_\mathrm{b}\ge\psi_\mathrm{f}$.
+\item[\code{cell_state(p, soc)}] Returns $(V_\mathrm{cell},R_0,R_1,C_1)$ of \cref{eq:cellrc}; accepts arrays for SOC.
+\item[\code{cell_rth(p)}, \code{cell_temperature(p, Pbatt, n_cells)}] \cref{eq:tcell}.
+\item[\code{mosfet_raw(p)}, \code{mosfet_data(p)}, \code{bimmc_rdson_raw()}, \code{bimmc_rdson_fun(p)}] Datasheet tables and the interpolation functions of the slopes and the normalised $\Rds(\Tj)$ (\code{rdson_poly_fun}, \code{fit_rdson_poly}).
+\item[\code{solve_mtpa(d, vmax, wm_vec, T_vec, PBase)}] MTPA currents on the grid, NaN for infeasible points (\cref{sec:mtpa}).
+\item[\code{dq_voltages(d, Id, Iq, wm_vec)}] \cref{eq:vd,eq:vq}.
+\item[\code{loss_maps(p, soc, wm_vec, T_vec, voltage_limit, rdson_tj, rdson_iter)}] \Cref{alg:maps}; returns a dictionary with the grid, the voltage limits, currents, $P_\mathrm{c}$, $P_\mathrm{s}$, $P_\mathrm{b}$, $\Tj$, $\Tc$, $T_\mathrm{cell}$ and the thermal-limit flags of both drives.
+\item[\code{efficiency(Pout, Ploss)}, \code{default_grid(p, n_speed, n_torque)}] \cref{eq:eta} and the default 50$\times$100 grid.
+\end{description}
+
+\subsection*{applications.py and cycles.py}
+\begin{description}\itemsep0pt
+\item[\code{APPLICATIONS}] Dictionary of the six presets (\code{params}, \code{vehicle}, \code{cycle}, \code{label}); \code{E3_MODES} holds the ISO 8178 E3 table.
+\item[\code{road_load_force(veh, v, a, slope)}, \code{gear_ratio(app)}] \cref{eq:roadload,eq:resistance} and the gear ratio of \cref{sec:profile}.
+\item[\code{machine_profile(app)}] Dispatches to \code{speed_cycle}, \code{road_cycle} (\cref{eq:cruise}), \code{normalised_cycle} (\cref{eq:nrtc}), \code{mode_cycle} and \code{rail_cycle} (\cref{eq:rail}); returns \code{t}, \code{dt}, \code{v}, \code{wm}, \code{T} (and \code{slope} for road cycles).
+\end{description}
+
+\subsection*{cycle\_eval.py}
+\begin{description}\itemsep0pt
+\item[\code{make_mtpa_solver(d)}, \code{mtpa_point(solver, d, wm, T, vmax)}] Reusable MTPA problem with warm start; returns $(i_\mathrm{d},i_\mathrm{q})$ or None if infeasible.
+\item[\code{feasible_torque(solver, d, wm, T_req, vmax)}] Largest feasible torque with ten bisection steps (\cref{eq:bisect}); returns \code{(T, (Id, Iq))}.
+\item[\code{losses_2l(...)}, \code{losses_bimmc(...)}] Single-point wrappers around \code{calc.calc_losses_2l} and \code{calc.calc_losses_bimmc}, including the $\Rds$ iteration and the BI-MMC speed floor.
+\item[\code{evaluate_cycle(app_key, soc0, rdson_iter=5)}] \Cref{alg:cycle}; returns the summary dictionary (\cref{sec:metrics}) and the per-sample trace.
+\item[\code{compute_maps(app_key, soc, n_speed, n_torque)}] Cached loss maps (NPZ in \code{results_cycles/}), used for the map backgrounds of the cycle figures.
+\item[\code{main()}] Command line: \code{--apps}, \code{--soc}, \code{--jobs}; writes the JSON, the Excel table and one CSV per job.
+\end{description}
+
+\subsection*{Front ends and utilities}
+\begin{description}\itemsep0pt
+\item[\code{main.py}] Streamlit dashboard: sidebar inputs (machine, device, battery, BI-MMC) $\to$ parameter dictionary $\to$ \code{model.loss_maps} $\to$ tabs for parameters, MTPA maps, loss and efficiency maps, comparison; saves figures and one Excel workbook.
+\item[\code{create_maps_PCIM.py}] \code{create_maps(app_key, soc, out_dir, xlsx)} produces the figure set of Analysis~I for an application; constants \code{VOLTAGE_LIMIT} and \code{RDSON_TJ} select the settings.
+\item[\code{plots.py}, \code{export.py}] \code{plot_*} functions for the data classes of \cref{sec:maps}; \code{write_workbook} writes maps as torque $\times$ speed blocks.
+\item[\code{sens.py}] \code{evaluate(p, speed_pu, torque_pu)} returns the point efficiencies of both drives; \code{run_sensitivity} sweeps the parameters of the list \code{SWEPT}; \code{plot_results} draws the sweep and tornado charts.
+\item[\code{fit_rdson.py}] Least-squares polynomial of degrees 1 to 5, RMSE and the equation string for the Infineon data.
+\end{description}

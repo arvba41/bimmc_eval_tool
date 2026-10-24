@@ -1,0 +1,148 @@
+% arara: pdflatex: {shell: on}
+% arara: bibtex
+% arara: pdflatex
+% arara: pdflatex
+
+\begin{filecontents*}{\jobname.bib}
+@INPROCEEDINGS{618742, 
+author={M. Held and P. Jacob and G. Nicoletti and P. Scacco and M. -. Poech}, 
+booktitle={Proceedings of Second International Conference on Power Electronics and Drive Systems}, 
+title={Fast power cycling test of IGBT modules in traction application}, 
+year={1997}, 
+volume={1}, 
+number={}, 
+pages={425-430 vol.1}, 
+keywords={traction;semiconductor device models;semiconductor device reliability;failure analysis;semiconductor device testing;insulated gate bipolar transistors;power semiconductor switches;thermal analysis;fast power cycling test;IGBT modules;traction application;insulated gate bipolar transistor;high reliability;power cycles withstand;temperature changes;bond wires lifting;failure mechanism;IGBT single switch;Testing;Insulated gate bipolar transistors;Temperature;Failure analysis;Switches;Multichip modules;Voltage;Stress;Bonding;Wires}, 
+doi={10.1109/PEDS.1997.618742}, 
+ISSN={}, 
+month={05},}
+
+@BOOK{SPD,
+title = {Semiconductor Power Device},
+author = {J. Lutz and H. Schlangenotto and U. Scheuermann and R. De Doncker},
+year = {2018},
+edition = {2},
+publisher = {Springer},
+doi={10.1007/978-3-319-70917-8}
+}
+
+@article{RAMMINGER20001521,
+title = "Reliability model for Al wire bonds subjected to heel crack failures",
+journal = "Microelectronics Reliability",
+volume = "40",
+number = "8",
+pages = "1521 - 1525",
+year = "2000",
+note = "Reliability of Electron Devices, Failure Physics and Analysis",
+issn = "0026-2714",
+doi = "https://doi.org/10.1016/S0026-2714(00)00139-6",
+url = "http://www.sciencedirect.com/science/article/pii/S0026271400001396",
+author = "S. Ramminger and N. Seliger and G. Wachutka"
+}
+\end{filecontents*}
+
+\documentclass{PCIM-Abstract}
+
+%even columns on last page -> pick the one that works best
+\usepackage{flushend}
+%or
+%\usepackage{balance} % with \balance placed anywhere in the text from the last page
+%or simply add \vfill\null at the end of the line where the column break should happen
+
+\usepackage{lipsum}
+\usepackage{xcolor}
+
+\addbibresource{\jobname.bib}
+
+%mandatory fields
+\title{Your Title – (max. 100 characters incl. spaces) Please Capitalize the Initial Letters of Your Title Except Prepositions and Articles}
+
+\topicnumberandnames{Topic number and topic name}
+\presentationform{Oral or poster presentation}
+
+\abstract{Here you are requested to write the abstract of your paper. The abstract should state briefly and clearly the purpose, methods, results and conclusions of the work. This abstract should not exceed the maximum 100 words.}
+
+\begin{document}
+{\LARGE\bfseries Abstract pattern – General requirements \par}
+\vskip 1em%
+{\bfseries Please read these instructions carefully!\par}
+\vskip 1em%
+{\bfseries\textcolor{red}{Deadline for submission is 14 October 2026.}\par}
+\vskip 1.5em%
+{\large\bfseries General instructions:\par}
+The number of pages should not exceed 3 pages without references and \SI{5}{\mega\byte}.
+
+Please capitalize the initial letters of your title except prepositions and articles.
+
+{\bfseries Important: the length of the title is limited to a maximum of 100 characters including spaces}.
+
+Each page should be a single column on European A4 size (\SI{210}{\milli\meter} $\times$ \SI{297}{\milli\meter}).
+
+The margins have to be set up as follows:
+\begin{tabbing}
+Top margin to the first line: \hspace*{2cm}	\= \SI{2.2}{\centi\meter} \\
+Bottom margin to the last line:				\> \SI{3.0}{\centi\meter} \\
+Left margin to the text:					\> \SI{1.7}{\centi\meter} \\
+Right margin to the text:					\> \SI{1.7}{\centi\meter}
+\end{tabbing}
+
+Please ensure that all fonts and pictures or tables are embedded in the final PDF-file.
+
+We recommend to use the following abstract pattern to produce your abstract for the PCIM Conference. 
+
+After your abstract is written please submit your abstract as PDF file online.
+
+\vskip 1.5em%
+{\large\bfseries How to \LaTeX: \par}
+
+This document compiles successfully with pdfLaTeX and TeX Live 2024 (generated with Overleaf).
+\vskip 1em%
+{\scriptsize Known compatibility issue with TeX Live 2025 on overleaf.com (warnings not affecting the pdf output):
+\begin{itemize}
+	\item Package biblatex Warning: Macro 'volume+number' undefined. Using \slash newbibmacro. This is a known compatibility issue between biblatex and the LaTeX 2025 kernel. 
+    \item The \slash showhyphens command was changed in the LaTeX kernel, causing conflicts with older packages (especially babel).
+\end{itemize}
+
+%the real document starts here
+\printtitle
+
+\section{Synopsis}
+Here, you start to write the synopsis (short form) of the real paper. It consists of an introduction, the body of the text with the different paragraphs, including figures, formula, tables, images and the conclusion.
+
+The synopsis is an extended summary of your work. Start by describing the problem your work addresses. Describe your work and how it contributes to the solution of the problem. Include, if relevant, as much evidence of completed experimental as possible.
+
+The guidelines and requirements for a synopsis submitted to PCIM Conference are:
+
+\begin{itemize}
+    \item Papers must be original material and not have been presented or published previously.
+    \item The synopsis should give a clear and precise statement of the purpose and contribution of the work, specific results and the methods used. Include key equations, figures, tables and experimental results.
+    \item All authors should obtain company and governmental clearance prior to submission of the synopsis.
+    \item Synopses marked or labeled as “Confidential”, “Proprietary” or with similar wording will not be accepted.
+    \item Synopses can be submitted in any version of Adobe Acrobat.pdf
+    \item Number all pages of the synopsis. 
+\end{itemize}
+
+\begin{figure*}
+\begin{minipage}[b]{.5\textwidth}
+\centering
+	\subfloat[]{\includegraphics[width=.9\linewidth]{graphic.pdf}}
+\end{minipage}%
+\begin{minipage}[b]{.5\textwidth}
+\centering
+	\subfloat[]{\includegraphics[width=.9\linewidth]{graphic.pdf}}
+\end{minipage}
+\caption{This is the caption of an image. It describes the content of the illustration or graph.}
+\label{Fig:one}
+\end{figure*}
+
+\section{This is a 1\textsuperscript{st} Order Heading}
+\lipsum[2] \cite{583620}
+
+\subsection{This is a 2\textsuperscript{nd} Order Heading}
+\lipsum[3] \cite{RAMMINGER20001521}
+
+\subsubsection{This is a 3\textsuperscript{rd} Order Heading}
+\lipsum[4] \cite{SPD}
+
+\printbibliography
+\end{document}

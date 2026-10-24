@@ -193,9 +193,8 @@ def battery_inputs(p):
 
 def bimmc_inputs(p):
     st.header("AC-battery parameters")
-    p["bimmc_sizing"] = "ceil"  # exactly Nsm submodules, cells per submodule rounded up
-    p["Nsm"] = st.number_input(
-        "Number of submodules per phase", min_value=1, value=12, step=1
+    p["Nscells_b"] = st.number_input(
+        "Number of series cells per submodule", min_value=1, value=10, step=1
     )
     p["Nsm_redundant_pu"] = st.number_input(
         "Number of redundant submodules per phase [pu]",

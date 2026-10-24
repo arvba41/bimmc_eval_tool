@@ -1,0 +1,94 @@
+% Full paper: Can an AC Battery Outperform the Conventional Two-Level Inverter?
+% Build (from this folder):  latexmk -pdf PCIM_paper.tex
+% (biber: see the build note in PCIM_synopsis.tex)
+%
+% Every figure and table with numbers is generated from the Python package in ../python:
+%   python/venv/bin/python python/cycle_eval.py                 # cycle results + traces
+%   python/venv/bin/python doc/figures/make_cycle_figures.py    # cycle_summary.pdf
+%   python/venv/bin/python doc/figures/make_paper_maps.py       # figures/maps/<app>/*.png
+%   python/venv/bin/python doc/figures/make_paper_assets.py     # figures/paper_*.pdf, tables/*.tex
+
+\documentclass{PCIM-Abstract}
+
+\usepackage[T1]{fontenc}
+\usepackage[scaled=0.9]{inconsolata}
+\usepackage{tikz}
+\usetikzlibrary{positioning,calc,arrows.meta,shapes.geometric,fit,backgrounds}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{amssymb}
+\usepackage{bm}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{longtable}
+\usepackage{float}
+
+\DeclareSIUnit\rpm{rpm}
+\DeclareSIUnit\pp{pp}
+\DeclareSIUnit\ohm{\ensuremath{\Omega}}
+
+% code identifiers in a monospaced face (the class maps \ttfamily to sans serif)
+\newcommand{\code}[1]{{\fontfamily{zi4}\selectfont\detokenize{#1}}}
+\lstset{
+  basicstyle=\fontfamily{zi4}\fontsize{8.5}{10.2}\selectfont,
+  mathescape=true, columns=fullflexible, keepspaces=true,
+  frame=single, framerule=0.3pt, rulecolor=\color{black!40},
+  xleftmargin=2pt, xrightmargin=2pt, aboveskip=6pt, belowskip=4pt,
+  numbers=left, numberstyle=\tiny\color{black!55}, numbersep=5pt,
+  keywordstyle=\bfseries, morekeywords={for,each,if,else,while,return,do,end,then,and,or,in,break,continue,to,until,step,set,compute,solve},
+  commentstyle=\color{black!55}, morecomment=[l]{//}
+}
+\renewcommand{\lstlistingname}{Alg.}
+\crefname{lstlisting}{Alg.}{Algs.}
+\Crefname{lstlisting}{Algorithm}{Algorithms}
+\crefname{table}{Tab.}{Tabs.}
+\Crefname{table}{Table}{Tables}
+\crefname{section}{Sec.}{Secs.}
+\Crefname{section}{Section}{Sections}
+\crefname{appendix}{App.}{Apps.}
+\Crefname{appendix}{Appendix}{Appendices}
+
+% notation
+\newcommand{\Nsm}{N_\mathrm{sm}}
+\newcommand{\Nssm}{N_\mathrm{s,sm}}
+\newcommand{\Npsm}{N_\mathrm{p,sm}}
+\newcommand{\Rds}{R_\mathrm{ds,on}}
+\newcommand{\Tj}{T_\mathrm{j}}
+\newcommand{\Tc}{T_\mathrm{c}}
+\newcommand{\Ihat}{\hat\imath}
+\newcommand{\etacyc}{\eta_\mathrm{cyc}}
+\newcommand{\BIMMC}{BI-MMC}
+
+\addbibresource{references.bib}
+
+%mandatory fields
+\title{Can an AC Battery Outperform the Conventional Two-Level Inverter? Efficiency Maps and Drive Cycles with an Open-Source Evaluation Platform}
+
+\topicnumberandnames{H01 Power Electronics for E-Mobility}
+\presentationform{Oral presentation}
+
+\abstract{Battery-integrated modular multilevel converters (BI-MMCs), also called AC batteries, replace the central traction inverter with battery submodules switched by low-voltage Si MOSFETs. Whether this beats a conventional two-level (2L) SiC inverter depends on where in the torque--speed plane, and for how long, a drive operates. This paper documents an open-source Python platform that answers the question with two analyses built on one set of loss equations: (i)~torque--speed efficiency maps of both drives, including maximum-torque-per-ampere (MTPA) control, device losses and a time-domain battery model, and (ii)~drive-cycle efficiency with state-of-charge and temperature tracking. All equations, algorithms and assumptions of the code are given. Applied to six applications from passenger cars to trains, the BI-MMC reduces semiconductor losses by \SIrange{26}{80}{\percent}, but its cells carry the switched phase current. It gains only about \SI{0.1}{\pp} in cycle efficiency where all energy is delivered below base speed (off-road machine, ship) and loses \SIrange{0.5}{1.7}{\pp} in car, bus, truck and train duty.}
+
+\begin{document}
+\printtitle
+
+\input{paper/sec_intro}
+\input{paper/sec_system}
+\input{paper/sec_software}
+\input{paper/sec_models}
+\input{paper/sec_maps}
+\input{paper/sec_cycles}
+\input{paper/sec_results}
+\input{paper/sec_discussion}
+\input{paper/sec_conclusion}
+
+\printbibliography
+
+\appendix
+\input{paper/app_params}
+\input{paper/app_reference}
+\input{paper/app_outputs}
+\input{paper/app_traces}
+
+\end{document}

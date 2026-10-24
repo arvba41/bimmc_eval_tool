@@ -41,7 +41,7 @@ SWEPT = [
     "Qcell",
     "R0_nom",
     "R1_nom",
-    "Nsm",
+    "Nscells_b",
     "Nsm_redundant_pu",
     "Rdson_bimmc",
     "Imax_mosfet",
@@ -53,7 +53,7 @@ SWEPT = [
     "Rth_jc_bimmc",
     "Rth_ca_bimmc",
 ]
-INTEGER_PARAMS = {"Nsm", "mf_bimmc", "pp"}
+INTEGER_PARAMS = {"Nscells_b", "mf_bimmc", "pp"}
 # Parameters that can't be scaled multiplicatively (nominal value of zero) use an absolute span
 ABSOLUTE_SPAN = {"Nsm_redundant_pu": (0.0, 0.2), "soc": (0.1, 1.0)}
 # Custom-MOSFET-only parameters are swept only when mosfet == "custom"

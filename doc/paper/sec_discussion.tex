@@ -1,0 +1,40 @@
+\section{Discussion: Design Rule, Assumptions and Limitations}\label{sec:discussion}
+\subsection{Why the cells decide}
+The semiconductor advantage of the BI-MMC is large and robust; the battery penalty is what decides the cycle result. At a fixed operating point, both battery losses scale with the inverse of the installed energy. For the 2L pack, with $I_\mathrm{dc}=P/V_\mathrm{dc}$, $V_\mathrm{dc}=N_\mathrm{s}V_\mathrm{cell}$ and $N_\mathrm{p}\approx E_\mathrm{b}/(Q_\mathrm{cell}V_\mathrm{cell}N_\mathrm{s})$, \cref{eq:pb2l} gives
+\begin{equation}
+P_\mathrm{b}^\mathrm{2L}\approx\frac{(R_0+R_1)\,Q_\mathrm{cell}}{V_\mathrm{cell}}\;\frac{P^2}{E_\mathrm{b}},\qquad \frac{P_\mathrm{b}^\mathrm{2L}}{P}\propto\frac{P}{E_\mathrm{b}},
+\label{eq:crate}
+\end{equation}
+that is, the relative battery loss grows with the C-rate $P/E_\mathrm{b}$ ($Q_\mathrm{cell}$ in Ah, $E_\mathrm{b}$ in Wh). The BI-MMC battery loss follows from \cref{eq:smrc,eq:pbbimmc} with $\Npsm\propto E_\mathrm{b}$ and therefore scales the same way, but with a larger factor because the gated phase current, not the DC current, flows through the cells; the ratio of the two is roughly independent of $E_\mathrm{b}$ at a given point (the cell counts are rounded). The code reproduces this scaling. \Cref{tab:energy} shows the efficiency at one operating point (\SI{0.5}{pu} speed, \SI{0.6}{pu} torque, \SI{50}{\percent} SOC) for halved and doubled energy: the BI-MMC battery loss is $2.0$--$2.7\times$ (car) and about $3\times$ (ship) the 2L loss, but doubling the energy of the passenger car moves the point difference from $-0.45$ to $-0.04$~pp, and the ship's difference becomes positive and grows. This is consistent with the cycle results: the applications with the lowest C-rate (ship \SI{0.4}{\per\hour}, off-road machine \SI{0.75}{\per\hour}) are the ones where the AC battery gains. It suggests a design rule: the AC battery pays off when (i)~most cycle energy is below base speed, so that the cells carry no reactive current, \emph{and} (ii)~the installed energy is large relative to the power, so that the cell losses are small. A systematic sweep of $E_\mathrm{b}$ over complete cycles is a natural use of the platform and is left to future work.
+
+\begin{table}[ht]
+\centering
+\caption{Point efficiency at \SI{0.5}{pu} speed, \SI{0.6}{pu} torque and \SI{50}{\percent} SOC for different installed energy. $P_\mathrm{b}/E_\mathrm{b}$ is the C-rate of the base power; $P_\mathrm{b}^\mathrm{2L}$, $P_\mathrm{b}^\mathrm{BI}$ here denote the battery loss in W. This is a single operating point and not a cycle result.}
+\label{tab:energy}
+\footnotesize
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+Application & $E_\mathrm{b}$ [kWh] & $P_\mathrm{base}/E_\mathrm{b}$ [1/h] & $P_\mathrm{b}^\mathrm{2L}$ [W] & $P_\mathrm{b}^\mathrm{BI}$ [W] & $\eta^\mathrm{2L}$ [\%] & $\eta^\mathrm{BI}$ [\%] & $\Delta\eta$ [pp] \\
+\midrule
+\input{tables/energy_scaling}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Assumptions and limitations}
+The numbers of this paper depend on the following modelling choices, which are fixed in the code and listed so that they can be changed or challenged.
+\begin{enumerate}
+\item \emph{Scope of the efficiency.} Only converter and battery losses are included. Machine copper, iron and mechanical losses and gear losses (which are only charged to the torque) are not. Because the machine currents of the two drives are almost equal, this should affect the difference less than the absolute values, but a field-weakening current that differs between the drives would change the copper loss.
+\item \emph{Conduction model.} Eqs.~\eqref{eq:pc2l} and \eqref{eq:pcbimmc} assume sinusoidal current and equal conduction time of all devices, no body-diode conduction, no dependence on the modulation index and no dead time. The BI-MMC always conducts through two devices per SM.
+\item \emph{Switching model.} The switching energy uses the average absolute current $\tfrac2\pi\Ihat$ at a single carrier-period event, constant slopes for the BI-MMC MOSFET (no datasheet curve) and the assumption that all $4\Nsm$ switches of a phase switch once per carrier period. Reverse-recovery, output-capacitance and gate-drive losses are not modelled.
+\item \emph{BI-MMC modulation.} All SMs of a phase receive the same gating signal (no phase-shifted carriers, no sorting), and circulating currents, balancing losses and the cost of redundancy beyond the voltage limit are not modelled. The simulation integrates two electrical periods with explicit Euler and a step of $1/(100f_\mathrm{c})$ and requires a speed floor at low speed (\cref{sec:eval}).
+\item \emph{2L battery.} The pack loss uses the DC resistance $R_0+R_1$ at the average DC current. The DC-link ripple current and capacitor losses are neglected.
+\item \emph{Thermal.} Junction, case and cell temperatures are steady-state values with fixed thermal resistances, no thermal capacitance and a constant coolant temperature. $\Rds(\Tj)$ is the only coupling to the losses. Cell aging, SOC dependence of the thermal path and temperature dependence of the cell resistance are not modelled.
+\item \emph{Control.} Currents are MTPA with voltage-limited field weakening at the OCV of the present SOC, the modulation limit is $V_\mathrm{dc}/\sqrt3$ for the 2L and $\Nssm\Nsm V_\mathrm{cell}$ for the BI-MMC, and no voltage margin or current-control dynamics are included. The 2L carrier frequency is fixed at \SI{10}{\kilo\hertz} for all speeds.
+\item \emph{Sizing and fairness.} Both drives get the same cell type and energy up to the rounding of the cell counts (the BI-MMC has $-0.8$ to $+8.4$~\% cells relative to the 2L pack, \cref{tab:conv}), and the BI-MMC string voltage is up to \SI{4.1}{\percent} above the 2L limit. The number of series cells per SM is an input, set per application; the default of 10 would give the car \SI{20}{\percent} more cells. Design choices that favour one side, such as the pulse number $m_\mathrm{f}=2$, the number of parallel devices, or the SM count, are inputs and are not optimised. The rated power and gear ratios of the bus, truck and train were sized so that the cycles stay inside the torque and power limits.
+\item \emph{Quasi-static evaluation.} Each cycle sample (mostly \SI{1}{\second}) is evaluated at steady state; faster transients are not captured. The common torque is the minimum of both drives, and in the synthetic train cycle part of the braking energy is clipped.
+\item \emph{Data.} The vehicle parameters are typical values, the truck road and vehicle data originate from an earlier truck study (files in \code{so_no/}) whose provenance still has to be documented, and the cell parameters are a nominal 24~Ah NMC cell with SOC scaling polynomials. The cycle results are therefore indicative of trends.
+\end{enumerate}
+
+\subsection{Sensitivity analysis and further use}
+\code{sens.py} sweeps every user input one at a time by $\pm30\,\%$ (integer parameters are rounded, SOC and redundancy use absolute ranges) around the nominal values and records the point efficiency of both drives at a chosen speed and torque, producing a table and a tornado chart. It uses the same \code{model.loss_maps} as the other analyses. The same dictionary-based interface allows a sweep over complete cycles with \code{cycle_eval.evaluate_cycle}.

@@ -1,0 +1,18 @@
+\section{Output Formats}\label{app:outputs}
+\paragraph{Cycle summary} (\code{results_cycles/cycle_results.json}, \code{.xlsx}): one record per application and initial SOC, with
+\code{app}, \code{label}, \code{cycle}, \code{soc_start}, \code{soc_end_2l}, \code{soc_end_bimmc}, \code{duration_s}, \code{distance_km}, \code{E_motoring_kWh}, \code{E_regen_kWh}, \code{E_clipped_motoring_kWh}, \code{E_clipped_regen_kWh}, \code{n_infeasible}, \code{share_below_base_speed}, \code{gear_ratio}, and for each drive $X\in\{$\code{2l}, \code{bimmc}$\}$: \code{E_Pc_X_kWh}, \code{E_Ps_X_kWh}, \code{E_Pb_X_kWh}, \code{E_loss_X_kWh}, \code{Tj_max_X}, \code{Tc_max_X}, \code{Tcell_max_X}, \code{eta_cycle_X}, \code{E_batt_net_X_kWh}, \code{kWh_per_100km_X}; and \code{delta_eta_pp}, \code{delta_loss_pct}.
+
+\paragraph{Cycle trace} (\code{results_cycles/losses_<app>_soc<NN>.csv}): one row per sample with \code{t}, \code{wm} [rad/s], \code{T_req}, \code{dt}, \code{soc_2l}, \code{soc_bimmc}, \code{T} (delivered), \code{P}, \code{infeasible}, and for each drive \code{Pc}, \code{Ps}, \code{Pb}, \code{Tj}, \code{Tc}, \code{Ploss}, \code{Tcell} with the suffix \code{_2l} or \code{_bimmc}.
+
+\paragraph{Map workbook} (\code{plot_data_*.xlsx}): sheets \code{Parameters}, the datasheet data and fits (\code{Switching_slopes_data}, \code{Switching_slopes_fit}, \code{Rdson_2L}, \code{Rdson_BIMMC}), the cell data (\code{Cell_OCV}, \code{Cell_RC_parameters}), and the maps of the MTPA analysis and of both converters and their comparison, each as one block per quantity with torque in rows and speed in columns; empty cells are infeasible or not plotted points.
+
+\paragraph{Figures} (\code{<out>/<application>/*.png}): \code{mtpa_maps}, \code{mtpa_maps_dqs}, \code{losses_maps_{2l,bimmc,comparison}}, \code{temperature_maps_{2l,bimmc}}, \code{efficiency_maps_{2l,bimmc,comparison}}, \code{individual_losses_maps_comparison} and \code{individual_efficiency_maps_comparison}, each with the suffix \code{_soc_<NN>}.
+
+\paragraph{Reproducing this paper.}
+\begin{lstlisting}[numbers=none, language={}]
+python/venv/bin/python python/cycle_eval.py --soc 0.2 0.5 0.9
+python/venv/bin/python doc/figures/make_cycle_figures.py
+python/venv/bin/python doc/figures/make_paper_maps.py
+python/venv/bin/python doc/figures/make_paper_assets.py
+cd doc && latexmk -pdf PCIM_paper.tex
+\end{lstlisting}

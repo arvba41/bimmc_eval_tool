@@ -1,0 +1,80 @@
+\section{Software Architecture}\label{sec:software}
+The platform is a Python package in the folder \code{python/} of the repository. It has no build step; the dependencies are NumPy, SciPy, pandas, matplotlib, CasADi \cite{andersson2019} with IPOPT \cite{waechter2006}, Numba \cite{lam2015}, tqdm, openpyxl and, for the dashboard, Streamlit. \Cref{tab:modules} lists the modules, and \cref{fig:flow} shows how the two analyses use them.
+
+\begin{table}[ht]
+\centering
+\caption{Modules of the Python package (\code{python/}).}
+\label{tab:modules}
+\footnotesize
+\setlength\tabcolsep{4pt}
+\begin{tabular}{@{}p{3.2cm}p{13.3cm}@{}}
+\toprule
+Module & Role \\
+\midrule
+\code{calc.py} & Low-level physics: MTPA optimisation problem (CasADi/IPOPT), 2L and BI-MMC loss functions, equivalent-circuit battery simulation (Numba-compiled). Dataclasses for the machine, switching slopes, battery, thermal network and converter configuration. \\
+\code{model.py} & Headless model shared by all front ends: user-input dictionary \code{NOMINAL}, derived design (\code{design}), cell state (\code{cell_state}), MOSFET data and Rdson(Tj) fits, MTPA over a grid (\code{solve_mtpa}), dq voltages, \code{loss_maps}, \code{efficiency}. \\
+\code{applications.py} & Presets of the six applications (drive rating, vehicle data, duty cycle), the road-load force and the gear ratio. \\
+\code{cycles.py} & Conversion of a duty cycle to a machine speed and torque time series (five cycle kinds). \\
+\code{cycle_eval.py} & Analysis~II: sample-by-sample cycle loss evaluation with SOC and temperature tracking, summary metrics, command-line driver. \\
+\code{create_maps_PCIM.py} & Analysis~I for every application: MTPA, loss, temperature and efficiency maps as figures (and Excel data). \\
+\code{main.py} & Streamlit dashboard for Analysis~I with interactive inputs. \\
+\code{plots.py}, \code{export.py} & Map figures (matplotlib) and Excel export of all plotted data. \\
+\code{sens.py} & One-at-a-time sensitivity of both efficiencies at one operating point. \\
+\code{fit_rdson.py} & Polynomial fit of normalised Rdson versus Tj from datasheet points. \\
+\code{test.py} & Interactive script that evaluates and plots one cycle. \\
+\code{data/} & Datasheet curves (CSV) and the public duty cycles (\code{data/cycles/}, with a README on provenance). \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[font=\footnotesize, >=Latex,
+  box/.style={draw, rounded corners=1.5pt, align=center, inner sep=3pt, minimum height=10mm, minimum width=38mm, text width=36mm, fill=black!4},
+  core/.style={box, fill=blue!8},
+  io/.style={box, fill=orange!10},
+  lab/.style={font=\scriptsize\itshape, text=black!65, anchor=south west}]
+  \def\dx{42.5mm}\def\dy{-24mm}
+  % inputs
+  \node[io] (p) at (0,0) {parameter dictionary\\ \code{model.NOMINAL} + overrides};
+  \node[core] (des) at (\dx,0) {\code{model.design(p)}\\ machine, cells, devices};
+  \node[core] (cell) at (2*\dx,0) {\code{model.cell_state(p, z)}\\ OCV, $R_0$, $R_1$, $C_1$};
+  \draw[->] (p) -- (des); \draw[->] (des) -- (cell);
+  % Analysis I
+  \node[box] (grid) at (0,\dy) {grid: 50 speeds $\times$ 100 torques\\ \code{default_grid}};
+  \node[box] (mtpa) at (\dx,\dy) {\code{solve_mtpa} (per drive)\\ $i_\mathrm{d}, i_\mathrm{q}$ on the grid};
+  \node[core] (lm) at (2*\dx,\dy) {\code{loss_maps} $\to$ \code{calc_losses_2l}, \code{calc_losses_bimmc}};
+  \node[box] (eff) at (3*\dx,\dy) {\code{efficiency}, \code{plots}, \code{export}};
+  \draw[->] (grid) -- (mtpa); \draw[->] (mtpa) -- (lm); \draw[->] (lm) -- (eff);
+  \node[lab] at ($(grid.north west)+(0,1mm)$) {Analysis I: efficiency maps (\code{main.py}, \code{create_maps_PCIM.py})};
+  % Analysis II
+  \node[box] (cyc) at (0,2*\dy) {\code{machine_profile}\\ $t,\Delta t,\omega_\mathrm{m}(t),T^*(t)$};
+  \node[box] (feas) at (\dx,2*\dy) {\code{feasible_torque}\\ MTPA per drive, common $T$};
+  \node[core] (lc) at (2*\dx,2*\dy) {\code{losses_2l}, \code{losses_bimmc} $\to$ same \code{calc} functions};
+  \node[box] (soc) at (3*\dx,2*\dy) {SOC and temperature update, energy sums};
+  \draw[->] (cyc) -- (feas); \draw[->] (feas) -- (lc); \draw[->] (lc) -- (soc);
+  \draw[->, rounded corners=2pt] (soc.south) -- ++(0,-5mm) -| node[font=\scriptsize\itshape, pos=0.25, below]{next sample: $z_{k+1}$} (feas.south);
+  \node[lab] at ($(cyc.north west)+(0,1mm)$) {Analysis II: drive-cycle efficiency (\code{cycle_eval.py})};
+  % shared inputs
+  \draw[->, dashed] (des.south) -- (mtpa.north);
+  \draw[->, dashed] (cell.south) -- (lm.north);
+\end{tikzpicture}
+\caption{Data flow of the two analyses. Both read the same parameter dictionary, the same derived design and the same cell model, and both end in the same two loss functions of \code{calc.py}. They differ only in how the operating points are generated (a fixed grid versus a duty cycle) and in what is accumulated. Dashed: shared inputs of Analysis~I; Analysis~II calls \code{cell_state} and the MTPA solver at every sample with the present SOC.}
+\label{fig:flow}
+\end{figure}
+
+\paragraph{Parameter dictionary.} All user inputs are collected in one dictionary in the format of \code{model.NOMINAL} (\cref{tab:params} in the appendix). The dashboard fills it from the sidebar, \code{applications.py} overrides a few entries per application, and \code{sens.py} sweeps entries one at a time. No module keeps hidden state, so a result is a pure function of this dictionary, the SOC and the grid or cycle.
+
+\paragraph{Two parameter sets.} The dashboard and \code{create_maps_PCIM.py} default to the settings of the original dashboard: both drives are limited to the 2L voltage and the on-resistance is constant. The cycle evaluation and this paper use the improved settings of \code{model.py}: each drive has its own voltage limit, and $\Rds$ follows the junction temperature. These are the switches \code{voltage_limit} and \code{rdson_tj} of \code{model.loss_maps}. All maps in this paper use the improved settings, so both analyses use the same model. The BI-MMC sizing (\cref{eq:npsm}) is identical in all front ends.
+
+\paragraph{Running the analyses.}
+\begin{lstlisting}[numbers=none, language={}]
+streamlit run main.py                                   # dashboard (maps)
+python create_maps_PCIM.py --apps car bus --soc 0.5     # maps per application
+python cycle_eval.py --apps car bus --soc 0.2 0.5 0.9   # drive cycles
+python sens.py --speed-pu 1.0 --torque-pu 0.8           # sensitivity
+python fit_rdson.py --degree 3 --plot                   # Rdson fit
+\end{lstlisting}
+Cycle jobs (application $\times$ initial SOC) run in parallel with a process pool; the 18 jobs of this paper take about \SI{20}{\second} on a laptop. Map computation takes about ten seconds per application, dominated by the time-domain battery simulation of the BI-MMC.
+
+\paragraph{Outputs.} Analysis~II writes \code{cycle_results.json/xlsx} (one row per application and SOC) and one trace CSV per job. Analysis~I writes PNG figures and, optionally, one Excel workbook with the data behind every plot (speed--torque maps as torque $\times$ speed blocks). \Cref{app:outputs} lists the formats. A static browser port of the dashboard is in \code{pages/}; this paper documents the Python implementation only.

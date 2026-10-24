@@ -1,0 +1,43 @@
+\section{Analysis I: Efficiency Maps}\label{sec:maps}
+The first analysis answers the question \emph{where in the torque--speed plane is each drive more efficient?} It evaluates \cref{eq:mtpa,eq:pc2l,eq:ps2l,eq:pb2l,eq:pcbimmc,eq:psbimmc,eq:pbbimmc,eq:eta} on a fixed grid at a given SOC. It is implemented in \code{model.loss_maps} and driven by \code{main.py} (interactive) or \code{create_maps_PCIM.py} (all applications).
+
+\subsection{Method}
+\paragraph{Grid.} The default grid (\code{model.default_grid}) has 50 speeds, $\omega_\mathrm{m}\in[0,\omega_\mathrm{m,max}]$, and 100 torques, $T\in[-T_\mathrm{b},T_\mathrm{b}]$, so that motoring ($T>0$) and regeneration ($T<0$) are covered. The shaft power on the grid is $P_\mathrm{out}=\omega_\mathrm{m}T$.
+
+\paragraph{Operating envelope.} A grid point belongs to the map of a drive if (i)~$|P_\mathrm{out}|\le P_\mathrm{b}$, (ii)~the MTPA problem \cref{eq:mtpa} has a solution under the drive's voltage limit \cref{eq:vmax}, and (iii)~$i_\mathrm{d}^2+i_\mathrm{q}^2\le I_\mathrm{b}^2$. All other points are NaN. The envelope of the drive with the lower voltage limit is therefore smaller at high speed, and low SOC shrinks both envelopes.
+
+\paragraph{Algorithm.} \Cref{alg:maps} lists the steps. The loss functions receive whole arrays, so each of the two drives is evaluated with one call; only the BI-MMC battery loss needs a loop over the grid because of the time-domain simulation.
+
+\begin{lstlisting}[caption={Efficiency maps (\code{model.loss_maps}) at a given SOC $z$.}, label={alg:maps}]
+d  $\leftarrow$ design(p);  (V$_\mathrm{cell}$, R$_0$, R$_1$, C$_1$) $\leftarrow$ cell_state(p, z)
+V$_\mathrm{dc}$ $\leftarrow$ V$_\mathrm{cell}$ N$_\mathrm{s}$;   $\hat v^\mathrm{2L}_\mathrm{max}$ $\leftarrow$ V$_\mathrm{dc}$/$\sqrt3$;   $v_\mathrm{s}$ $\leftarrow$ V$_\mathrm{cell}$ N$_\mathrm{s,sm}$
+$\hat v^\mathrm{BI}_\mathrm{max}$ $\leftarrow$ $v_\mathrm{s}$ N$_\mathrm{sm}$ (1-r)      // "own"; equal to $\hat v^\mathrm{2L}_\mathrm{max}$ for the dashboard setting
+for each drive X in {2L, BI-MMC}:
+    for each speed $\omega_\mathrm{m}$ (outer) and torque T (inner):
+        if |$\omega_\mathrm{m}$ T| > P$_\mathrm{b}$: mark NaN; continue
+        solve Eq. $\eqref{eq:mtpa}$ with limit $\hat v^X_\mathrm{max}$, warm start from the last solution
+        if the solver fails or i$_\mathrm{d}^2$+i$_\mathrm{q}^2$ > I$_\mathrm{b}^2$: mark NaN
+    (v$_\mathrm{d}$, v$_\mathrm{q}$) $\leftarrow$ Eq. $\eqref{eq:vd}$, $\eqref{eq:vq}$ for X's currents
+(P$_\mathrm{c}$, P$_\mathrm{s}$, P$_\mathrm{b}$, T$_\mathrm{j}$, T$_\mathrm{c}$) of 2L $\leftarrow$ 5 x calc_losses_2l with R$_\mathrm{ds,on}$ iteration, Eq. $\eqref{eq:rdsiter}$
+f$_\mathrm{c}$ $\leftarrow$ m$_\mathrm{f}$ p $\omega_\mathrm{m}$/(2$\pi$)
+(P$_\mathrm{c}$, P$_\mathrm{s}$, P$_\mathrm{b}$, T$_\mathrm{j}$, T$_\mathrm{c}$) of BI-MMC $\leftarrow$ calc_losses_bimmc, battery loss from Eq. $\eqref{eq:io}$-$\eqref{eq:pbbimmc}$
+T$_\mathrm{cell}$ $\leftarrow$ Eq. $\eqref{eq:tcell}$ for both drives
+$\eta$ $\leftarrow$ Eq. $\eqref{eq:eta}$;  $\Delta\eta$ $\leftarrow$ $\eta^\mathrm{BI}$ - $\eta^\mathrm{2L}$
+\end{lstlisting}
+
+\paragraph{Settings.} \code{loss_maps} has two switches. With \code{voltage_limit="own"} (default) each drive uses its own limit; \code{"2l"} gives the 2L limit to both, as the original dashboard does. With \code{rdson_tj=True} (default) $\Rds$ follows $\Tj$ for both drives; \code{False} keeps the \SI{25}{\celsius} value. All maps of this paper use the defaults.
+
+\paragraph{Thermal limits.} The result also holds the steady-state flags $\Tj\le T_\mathrm{j,max}$ and $\Tc\le T_\mathrm{c,max}$ (\SI{175}{\celsius} and \SI{100}{\celsius} for the 2L module; \SI{175}{\celsius} for the BI-MMC). The maps are \emph{not} masked by them, because a transient cycle can pass through such points without reaching steady state.
+
+\subsection{Outputs}
+For each drive the platform draws (i)~MTPA maps: $i_\mathrm{d}$, $i_\mathrm{q}$, $v_\mathrm{d}$, $v_\mathrm{q}$ in per unit of $I_\mathrm{b}$ and $V_\mathrm{dc}$, and the magnitudes and power factor; (ii)~loss maps $P_\mathrm{c}$, $P_\mathrm{s}$, $P_\mathrm{b}$ in kW; (iii)~temperature maps $\Tc$, $\Tj$, $T_\mathrm{cell}$; and (iv)~efficiency maps $\eta_\mathrm{c}$, $\eta_\mathrm{s}$, $\eta_\mathrm{b}$ and $\eta$, where values below $\SI{90}{\percent}$ are not drawn. For the comparison it draws the total loss and efficiency of both drives and their difference $\Delta\eta=\eta^\mathrm{BI}-\eta^\mathrm{2L}$ (blue: the BI-MMC is better), and the same difference for each loss component. All plotted data can be written to one Excel workbook. The red dashed line in all figures is the torque limit, $\min(T_\mathrm{b},P_\mathrm{b}/\omega_\mathrm{m})$.
+
+\subsection{Reading the maps}
+\Cref{fig:mapcar} shows the MTPA currents and voltages of the passenger car. Below base speed ($\SI{5000}{\rpm}$), $i_\mathrm{d}$ is only used for reluctance torque, and the voltage rises with speed. At and above base speed the voltage limit becomes active, $i_\mathrm{d}$ turns strongly negative (field weakening) and $i_\mathrm{q}$ falls so that the torque follows the constant-power limit. It is this region where the two drives differ most, because the field-weakening current is a reactive current that flows through the cells of the BI-MMC but not through the cells of the 2L pack.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.78\linewidth]{figures/maps/car/mtpa_maps_soc_50.png}
+\caption{MTPA currents and voltages of the passenger car at \SI{50}{\percent} SOC (per unit of $I_\mathrm{b}=\SI{500}{\ampere}$ and $V_\mathrm{dc}$). Red dashed line: torque limit.}
+\label{fig:mapcar}
+\end{figure}

@@ -1,0 +1,78 @@
+\section{Compared Systems and Notation}\label{sec:system}
+\Cref{fig:topologies} shows the two architectures. In both, an interior permanent-magnet synchronous machine (PMSM, $p=4$ pole pairs) is fed from a battery of the same cells and the same installed energy $E_\mathrm{b}$.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[font=\footnotesize, >=Latex,
+  blk/.style={draw, rounded corners=1pt, minimum height=7mm, align=center, inner sep=2pt},
+  sm/.style={draw, minimum width=8mm, minimum height=4.5mm, inner sep=1pt, font=\scriptsize}]
+  % (a) two-level
+  \node[blk, minimum width=17mm] (pack) {Battery pack\\$N_\mathrm{s}$s$N_\mathrm{p}$p};
+  \node[blk, right=12mm of pack, minimum width=17mm] (inv) {2L SiC inverter\\\SI{10}{\kilo\hertz}};
+  \node[draw, circle, right=9mm of inv, minimum size=9mm] (m1) {PMSM};
+  \draw[->] (pack) -- node[above, font=\scriptsize]{$V_\mathrm{dc}$, $I_\mathrm{dc}$} (inv);
+  \draw[->] (inv) -- node[above, font=\scriptsize]{3$\sim$} (m1);
+  \node[font=\footnotesize] at ($(inv.south)+(0,-17.75mm)$) {(a)};
+  % (b) BI-MMC
+  \begin{scope}[xshift=92mm, yshift=6mm]
+    \foreach \ph/\y in {a/0, b/-6.5mm, c/-13mm} {
+      \node[sm] (s1\ph) at (0,\y) {SM$_1$};
+      \node[sm, right=2mm of s1\ph] (s2\ph) {SM$_2$};
+      \node[right=1mm of s2\ph] (d\ph) {$\cdots$};
+      \node[sm, right=1mm of d\ph] (sn\ph) {SM$_{N_\mathrm{sm}}$};
+      \draw (s1\ph) -- (s2\ph);
+      \draw (sn\ph.east) -- ++(4mm,0) coordinate (o\ph);
+      \draw (s1\ph.west) -- ++(-3mm,0) coordinate (n\ph);
+    }
+    \draw (na) -- (nc);
+    \node[left=0mm of nb, font=\scriptsize] {N};
+    \node[draw, circle, minimum size=9mm] (m2) at ($(ob)+(9mm,0)$) {PMSM};
+    \draw (oa) -- (ob) -- (oc);
+    \draw[->] (ob) -- (m2);
+    \node[font=\scriptsize, align=left, anchor=north west] at ($(s1c.south west)+(0,-0.5mm)$)
+      {SM: full bridge (4 Si MOSFET switches)\\+ local cells, $f_\mathrm{c}=m_\mathrm{f}f_\mathrm{e}$};
+    \node[font=\footnotesize] at ($(s2c.south)+(8mm,-12mm)$) {(b)};
+  \end{scope}
+\end{tikzpicture}
+\caption{Compared architectures: (a) battery pack with a two-level SiC inverter; (b) BI-MMC with three star-connected strings of $\Nsm$ battery-integrated full-bridge submodules. Each SM holds $\Nssm$ series and $\Npsm$ parallel cells.}
+\label{fig:topologies}
+\end{figure}
+
+\paragraph{Two-level drive.} The pack has $N_\mathrm{s}$ series and $N_\mathrm{p}$ parallel cells and feeds a three-phase, six-switch SiC inverter (Wolfspeed EDB005M12TM4 \cite{wolfspeed_edb005}, $N_\mathrm{p,mos}$ devices in parallel per switch). The inverter switches the pack voltage $V_\mathrm{dc}$ at the fixed carrier frequency $f_\mathrm{sw}$ (default \SI{10}{\kilo\hertz}). The pack carries only the DC current $I_\mathrm{dc}$, which is the active-power current plus the converter losses.
+
+\paragraph{AC battery.} Each of the three phases is a string of $\Nsm$ full-bridge SMs. An SM contains $\Nssm$ series and $\Npsm$ parallel cells and four Si MOSFET switches (each $N_\mathrm{p,mos}$ devices in parallel; Infineon IQDH29NE2LM5CGSC data for the on-resistance). The SM output is $+v_\mathrm{s}$, $0$ or $-v_\mathrm{s}$. The phase voltage is the sum of the inserted SM voltages, so the phase-voltage amplitude is at most $\Nsm\Nssm V_\mathrm{cell}$. The carrier frequency is $f_\mathrm{c}=m_\mathrm{f}f_\mathrm{e}$, i.e.\ a \emph{multiple of the fundamental frequency} (pulse number $m_\mathrm{f}$, default 2), not a fixed value. Because the cells are in series with the load, the cell current equals the phase current whenever the SM is inserted.
+
+\paragraph{What is held equal.} Both drives share the machine, the cell type (\SI{24}{\ampere\hour} NMC) and the installed energy $E_\mathrm{b}$ (up to the rounding of the cell counts). The BI-MMC is sized from the number of series cells per SM so that it reaches at least the phase voltage the 2L inverter reaches with space-vector modulation (\cref{sec:sizing}). The efficiency in this paper covers the \emph{converter and battery losses only}; machine losses (copper, iron, mechanical) are not included, for either drive (see \cref{sec:discussion}).
+
+\paragraph{Notation.} \Cref{tab:notation} lists the main symbols and the corresponding names in the code. All dq quantities are \emph{peak} (amplitude-invariant) values. Phase quantities of the machine are rotor-synchronous: $\omega_\mathrm{e}=p\,\omega_\mathrm{m}$ with $\omega_\mathrm{m}$ the mechanical speed in \si{\radian\per\second}.
+
+\begin{table}[ht]
+\centering
+\caption{Main symbols and their names in the Python code.}
+\label{tab:notation}
+\footnotesize
+\setlength\tabcolsep{4pt}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Symbol & Meaning & Unit & Code \\
+\midrule
+$P_\mathrm{b}$, $\omega_\mathrm{b}$, $T_\mathrm{b}$ & base power, speed, torque & W, rad/s, N\,m & \code{PBase}, \code{wmBase}, \code{TBase} \\
+$V_\mathrm{b}$, $V_\mathrm{max}$ & base and maximum phase voltage (peak) & V & \code{VBase}, \code{VMax} \\
+$I_\mathrm{b}$ & peak current limit & A & \code{Ibase} \\
+$\psi_\mathrm{f}$, $R_\mathrm{s}$, $L_\mathrm{d}$, $L_\mathrm{q}$ & machine parameters & Wb, \si{\ohm}, H & \code{magnet_flux}, \dots \\
+$i_\mathrm{d}$, $i_\mathrm{q}$, $v_\mathrm{d}$, $v_\mathrm{q}$ & dq currents and voltages (peak) & A, V & \code{Id}, \code{Iq}, \code{Vd}, \code{Vq} \\
+$\Ihat$ & stator current amplitude $\sqrt{i_\mathrm{d}^2+i_\mathrm{q}^2}$ & A & \\
+$T$, $P_\mathrm{out}$ & shaft torque, shaft power $\omega_\mathrm{m}T$ & N\,m, W & \code{T}, \code{Pout} \\
+$z$ & cell state of charge & -- & \code{soc} \\
+$V_\mathrm{cell}$, $R_0$, $R_1$, $C_1$ & cell OCV and equivalent circuit & V, \si{\ohm}, \si{\ohm}, F & \code{cell_state()} \\
+$N_\mathrm{s}$, $N_\mathrm{p}$ & series and parallel cells of the 2L pack & -- & \code{Nscells_2l}, \code{Npcells_2l} \\
+$\Nsm$, $\Nssm$, $\Npsm$ & SMs per phase, series and parallel cells per SM & -- & \code{Nsm}, \code{Nscells_b}, \code{Npcells_b} \\
+$r$ & redundant SM share & pu & \code{Nsm_redundant_pu} \\
+$N_\mathrm{p,mos}$ & parallel devices per switch & -- & \code{Npmos_2l}, \code{Npmos_b} \\
+$\Rds$ & on-resistance & \si{\ohm} & \code{Rdson_2l}, \code{Rdson_bimmc} \\
+$f_\mathrm{sw}$, $m_\mathrm{f}$ & 2L carrier frequency, BI-MMC pulse number & Hz, -- & \code{fsw}, \code{mf_bimmc} \\
+$P_\mathrm{c}$, $P_\mathrm{s}$, $P_\mathrm{b}$ & conduction, switching, battery loss & W & \code{Pc}, \code{Ps}, \code{Pb} \\
+$\Tj$, $\Tc$, $T_\mathrm{cell}$ & junction, case, cell temperature & \si{\celsius} & \code{Tj}, \code{Tc}, \code{Tcell} \\
+\bottomrule
+\end{tabular}
+\end{table}

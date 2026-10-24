@@ -89,12 +89,8 @@ NOMINAL = {
     "poly_c": CELL_POLY_C_DEFAULT,
     **CELL_THERMAL_DEFAULT,  # thickness [m], conductivity [W/mK], area [m^2] for Rth_cell
     # BI-MMC
-    "Nsm": 12,  # preferred number of submodules per phase (see "bimmc_sizing")
+    "Nscells_b": 10,  # series cells per submodule; Nsm follows from the voltage
     "Nsm_redundant_pu": 0.0,
-    # "match": submodules x cells per submodule chosen (near Nsm) so that the BI-MMC
-    #          peak phase voltage matches the 2L inverter's (fair comparison);
-    # "ceil":  exactly Nsm submodules, cells per submodule rounded up (dashboard)
-    "bimmc_sizing": "match",
     "Rdson_bimmc": 0.3e-3,  # [Ohm] at 25 °C
     # 3rd order Rdson(Tj) polynomial [c3 .. c0] of the BI-MMC MOSFET; None = fit of the
     # IQDH29NE2LM5CGSC datasheet data
@@ -230,26 +226,10 @@ class Design:
     Nscells_2l: int
     Npcells_2l: int
     Npmos_2l: int
-    Nsm: int  # submodules per phase
+    Nsm: int  # submodules per phase (redundant ones included), from Nscells_b
     Nscells_b: int  # series cells per submodule
-    Npcells_b: float  # may be fractional with "match" sizing (equal cell count)
+    Npcells_b: int
     Npmos_b: int
-
-
-def bimmc_sizing(p, Nscells_2l, VBase, Vnom, window=3):
-    """Submodules per phase and series cells per submodule of the BI-MMC."""
-    Nsm = int(p["Nsm"])
-    if p.get("bimmc_sizing", "match") == "ceil":
-        return Nsm, int(np.ceil(2 * VBase / np.sqrt(3) / (Vnom * Nsm)))
-    # cells per phase that give the 2L peak phase voltage (Vdc / sqrt(3) with SVPWM)
-    target = Nscells_2l / np.sqrt(3)
-    candidates = [
-        (abs(n * c - target), abs(n - Nsm), n, c)
-        for n in range(max(Nsm - window, 1), Nsm + window + 1)
-        for c in {max(int(np.floor(target / n)), 1), int(np.ceil(target / n))}
-    ]
-    _, _, n, c = min(candidates)
-    return n, c
 
 
 def design(p) -> Design:
@@ -270,13 +250,11 @@ def design(p) -> Design:
     Vnom = OCV[p["chemistry"]][OCV["soc"].index(0.5)]
     Nscells_2l = int(np.ceil(2 * VBase / Vnom))
     Npcells_2l = int(np.ceil(p["Ebatt"] / (p["Qcell"] * Vnom * Nscells_2l)))
-    Nsm, Nscells_b = bimmc_sizing(p, Nscells_2l, VBase, Vnom)
-    if p.get("bimmc_sizing", "match") == "ceil":
-        Npcells_b = int(np.ceil(p["Ebatt"] / (3 * Nsm * Vnom * Nscells_b * p["Qcell"])))
-    else:
-        # same total number of cells (installed energy) as the 2L pack; the
-        # equivalent parallel count is then generally not an integer
-        Npcells_b = Nscells_2l * Npcells_2l / (3 * Nsm * Nscells_b)
+    # BI-MMC: the user gives the series cells per submodule; the submodules per phase
+    # (redundant ones included) follow from the peak phase voltage VMax
+    Nscells_b = int(p["Nscells_b"])
+    Nsm = int(np.ceil(VMax / Vnom / Nscells_b / (1 - p["Nsm_redundant_pu"])))
+    Npcells_b = int(np.ceil(p["Ebatt"] / (3 * Nsm * Vnom * Nscells_b * p["Qcell"])))
     return Design(
         VBase=VBase,
         VMax=VMax,
